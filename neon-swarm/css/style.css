@@ -1,0 +1,224 @@
+/* ============================================================
+   NEON SWARM - css/style.css
+   Base frame + design tokens.
+
+   Per DESIGN.md section 0 and section 8, every screen (TITLE,
+   PLAYING HUD, LEVELUP, PAUSED, GAME OVER) is drawn ON CANVAS by
+   js/hud.js - the DOM holds nothing but <canvas id="game">.
+   The classes below are the pre-styled overlay kit for the few
+   cases where HTML is allowed to speak (noscript, error notes,
+   optional dev overlays), mirroring the neon look the canvas
+   screens use. Keep the tokens in sync with section 5.3 palette.
+
+   Canvas screens this kit mirrors (section 8):
+     TITLE     - neon logo, controls panel, best score, blinking prompt
+     PLAYING   - XP bar top, HP bar, score, combo, dash ring, crosshair
+     LEVELUP   - dim overlay + 3 stacked upgrade cards (LV n/max on each)
+     PAUSED    - dim overlay + "PAUSED" + hint line
+     GAME OVER - stats block + retry/title prompt
+   ============================================================ */
+
+/* ---- 1. Design tokens (DESIGN.md section 5.3 palette) ---- */
+:root {
+  --ns-bg: #05050e;
+  --ns-grid: rgba(90, 40, 200, 0.18);
+  --ns-cyan: #35e6ff;
+  --ns-bullet: #aef6ff;
+  --ns-magenta: #ff2d95;
+  --ns-green: #39ff14;
+  --ns-orange: #ff9f1c;
+  --ns-violet: #c86bff;
+  --ns-crit: #ffb300;
+  --ns-hp: #ff3355;
+  --ns-ink: #e8f6ff;
+  --ns-dim: #8ea2b8;
+  --ns-font: Consolas, "Courier New", monospace;
+}
+
+/* ---- 2. Base frame ---- */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--ns-bg);
+}
+
+body {
+  font-family: var(--ns-font);
+  color: var(--ns-ink);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
+/* The single game surface. Fixed to the viewport; HiDPI crispness is handled
+   in JS via the backing-store scale (section 7.7). */
+canvas#game {
+  display: block;
+  position: fixed;
+  inset: 0;
+  /* The game draws its own crosshair while playing; the native crosshair
+     cursor keeps menus usable without duplicating the in-game one. */
+  cursor: crosshair;
+  outline: none;
+}
+
+canvas#game:focus {
+  outline: none;
+}
+
+::selection {
+  background: transparent;
+}
+
+/* ---- 3. Screen overlay kit ----
+   Pre-styled DOM primitives matching the canvas screens. Hidden by default
+   via the [hidden] attribute; .ns-screen dims whatever is behind it. */
+.ns-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 24px;
+  text-align: center;
+  background: rgba(5, 5, 14, 0.72);
+  color: var(--ns-ink);
+  font: 16px/1.5 var(--ns-font);
+  pointer-events: none;
+}
+
+.ns-screen[hidden] {
+  display: none;
+}
+
+/* Per-screen dim levels (match the canvas overlays). */
+.ns-screen--levelup {
+  background: rgba(5, 5, 14, 0.6);
+}
+
+.ns-screen--pause {
+  background: rgba(5, 5, 14, 0.72);
+}
+
+.ns-screen--gameover {
+  background: rgba(20, 4, 10, 0.8);
+}
+
+/* Neon logo / big headline. */
+.ns-title {
+  font-size: 46px;
+  letter-spacing: 0.14em;
+  color: var(--ns-cyan);
+  text-shadow: 0 0 18px rgba(53, 230, 255, 0.8), 0 0 46px rgba(53, 230, 255, 0.35);
+}
+
+/* Secondary line / controls hint. */
+.ns-sub {
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  color: var(--ns-dim);
+}
+
+/* Bordered neon panel (controls list, stats block). */
+.ns-panel {
+  padding: 18px 28px;
+  border: 1px solid rgba(53, 230, 255, 0.35);
+  background: rgba(10, 12, 30, 0.85);
+  box-shadow: 0 0 24px rgba(53, 230, 255, 0.12), inset 0 0 18px rgba(53, 230, 255, 0.05);
+}
+
+/* Level-up card row: 3 cards side by side, hovered card lifts and glows. */
+.ns-cards {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.ns-card {
+  width: 220px;
+  padding: 16px;
+  border: 1px solid rgba(53, 230, 255, 0.4);
+  background: rgba(10, 12, 30, 0.9);
+  color: var(--ns-ink);
+  text-align: left;
+  transition: transform 0.12s ease-out, box-shadow 0.12s ease-out, border-color 0.12s ease-out;
+}
+
+.ns-card:hover,
+.ns-card:focus-visible {
+  transform: translateY(-4px);
+  border-color: var(--ns-cyan);
+  box-shadow: 0 0 22px rgba(53, 230, 255, 0.35);
+  outline: none;
+}
+
+/* Progress bar primitive (mirrors the canvas HP/XP/dash bars). */
+.ns-bar {
+  width: 220px;
+  height: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.ns-bar__fill {
+  height: 100%;
+  background: var(--ns-cyan);
+}
+
+.ns-bar--hp .ns-bar__fill {
+  background: var(--ns-hp);
+}
+
+/* Accent helpers. */
+.ns-accent-cyan {
+  color: var(--ns-cyan);
+}
+
+.ns-accent-magenta {
+  color: var(--ns-magenta);
+}
+
+.ns-accent-green {
+  color: var(--ns-green);
+}
+
+.ns-accent-red {
+  color: var(--ns-red, var(--ns-hp));
+}
+
+/* Blinking "CLICK TO START"-style prompt. */
+.ns-blink {
+  animation: ns-blink 1.1s steps(2, jump-none) infinite;
+}
+
+@keyframes ns-blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ns-blink {
+    animation: none;
+  }
+}
+
+/* ---- 4. JS disabled ----
+   The game cannot run without JavaScript; the game canvas stays dark. */
+noscript .ns-screen {
+  pointer-events: auto;
+}
