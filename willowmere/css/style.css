@@ -1,0 +1,31 @@
+/* Willowmere — base styles.
+   The canvas fills the window; the game renders in logical CSS pixels with
+   DPR-aware backing store (see main.js when it lands). Runs from file://. */
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #0b0f14;
+  overflow: hidden;
+}
+
+body {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
+#game {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  outline: none;
+  cursor: default;
+  /* crisp pixel-art upscaling when the backing store is smaller than CSS */
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}
