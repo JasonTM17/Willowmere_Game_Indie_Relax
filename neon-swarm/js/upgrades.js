@@ -32,7 +32,14 @@
     card('bullet',    'Hypersonic',      'Bullet speed +20%, bullet size +10%',              3, 70),
     card('aura',      'Static Field',    'Aura: 8 dps to foes within 65 px',                 3, 50),
     card('crit',      'Overclock',       'Crit chance +10% (base 5%, cap 60%)',              5, 80),
-    card('greedy',    'Data Thirst',     'XP gained +25%',                                   3, 70)
+    card('greedy',    'Data Thirst',     'XP gained +25%',                                   3, 70),
+    // ---- v2: The Dawn Protocol ----------------------------------------------
+    card('nova',      'Nova Mastery',    'Nova bomb charges 6 kills faster',                 3, 60),
+    card('ricochet',  'Ricochet',        'Spent bullets retarget to +1 nearby foe',          3, 60),
+    card('execution', 'Execution',       '+18% dmg to foes under 30% HP',                    3, 55),
+    card('plating',   'Plating',         'Contact damage taken -15% (cap 45%)',              3, 55),
+    card('tempo',     'Tempo',           'Combo window +0.7 s',                              3, 65),
+    card('shrapnel',  'Shrapnel',        'Kills emit 3 fragments (+2 per stack)',            3, 55)
   ];
 
   // Fallback card: offered only when fewer than 3 real upgrades remain;

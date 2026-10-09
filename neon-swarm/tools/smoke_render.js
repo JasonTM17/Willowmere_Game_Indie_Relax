@@ -196,7 +196,8 @@ function main() {
   step('load ' + ORDER.length + ' game scripts in index.html order', loadScripts);
 
   const g = globalThis;
-  const Game = g.Game, GI = g.GameInput, GE = g.GameEntities, GW = g.GameWaves;
+  const Game = g.Game, GI = g.GameInput, GE = g.GameEntities, GW = g.GameWaves,
+        GV = g.GameUpgrades;
 
   step('boot: game object, rAF captured, TITLE state', function () {
     assert(Game && typeof Game === 'object', 'window.Game missing — main.js did not run');
@@ -335,6 +336,83 @@ function main() {
     assert(Game.state === 1, 'expected PLAYING after retry, got ' + Game.state);
     assert(Game.score === 0 && GW.state.wave === 1,
       'run did not fully reset (score ' + Game.score + ', wave ' + GW.state.wave + ')');
+  });
+
+  step('v2 action: nova bomb clears bullets + resets charge', function () {
+    const p = Game.player;
+    p.novaCharge = p.novaNeed;
+    // park two enemy bullets on the player so the clear is observable
+    Game.enemyBullets.push(new GE.EnemyBullet(Game, p.x + 20, p.y, 0, 0, 5));
+    Game.enemyBullets.push(new GE.EnemyBullet(Game, p.x - 20, p.y, 0, 0, 5));
+    GI.pressedThisFrame.add('ShiftLeft');
+    pump(1);
+    assert(p.novaCharge === 0, 'nova charge not consumed');
+    const live = Game.enemyBullets.filter(function (b) { return !b.dead; }).length;
+    assert(live === 0, 'nova did not clear enemy bullets (' + live + ' left)');
+  });
+
+  step('v2 action: elite drops 3 gems + a pickup; pickup arms a timer', function () {
+    const p = Game.player;
+    const gems0 = Game.gems.length;
+    const elite = new GE.Enemy(Game, p.x + 40, p.y, 'drone', null, true);
+    assert(elite.elite && elite.maxHp > 20, 'elite stats not boosted');
+    Game.enemies.push(elite);
+    elite.onHit(9999, p.x, p.y, {});   // kill it dead
+    assert(elite.dead !== true, 'onHit should not kill without handleKill path');
+    elite.die();
+    pump(2);
+    assert(Game.gems.length >= gems0 + 3, 'elite did not drop triple gems');
+    assert(Game.pickups.length > 0, 'elite dropped no pickup');
+    const pk = Game.pickups[Game.pickups.length - 1];
+    pk.x = p.x; pk.y = p.y;            // walk over it
+    pump(2);
+    const kinds = Object.keys(GE.PICKUP_TYPES);
+    assert(kinds.some(function (k) { return p.pickups[k] > 0; }),
+      'pickup did not arm any timer');
+  });
+
+  step('v2 action: weaver + mite spawn/behave without errors', function () {
+    const p = Game.player;
+    while (Game.state === 2) Game.pickUpgrade(0);   // drain any queued level-up
+    p.hp = p.maxHp;                                  // survive the mite blast
+    const w = new GE.Enemy(Game, p.x + 120, p.y, 'weaver', null);
+    const m = new GE.Enemy(Game, p.x + 10, p.y, 'mite', null);
+    Game.enemies.push(w); Game.enemies.push(m);
+    pump(90);                          // ~1.5 s: weaver cycles, mite fuses+dies
+    assert(m.dead || m.detonated, 'mite never fuzed/detonated');
+  });
+
+  step('v2 action: wave 8 surge window compresses spawning', function () {
+    while (Game.state === 2) Game.pickUpgrade(0);   // world must be PLAYING
+    const p = Game.player;
+    p.hp = p.maxHp;
+    GW.state.wave = 7;
+    GW.state.waveTimer = 34.9;
+    pump(10);
+    assert(GW.state.wave === 8, 'wave did not advance to 8');
+    assert(GW.state.surgeT > 0, 'surge did not start on wave 8');
+    const sc = GW.scaling();
+    assert(sc.spawnInterval < 0.85 - 0.06 * 7,
+      'spawn interval not compressed during surge');
+  });
+
+  step('v2 action: six new upgrade cards apply through GameUpgrades', function () {
+    const p = Game.player;
+    // Earlier pickUpgrade(0) calls may already have stacked a card, so accept
+    // a refused apply only when the card is genuinely maxed out.
+    function applyOrCheck(id, fn) {
+      if (GV.apply(p, id) !== true) {
+        assert((p.upStacks[id] || 0) >= GV.byId(id).max,
+          id + ' apply failed but card is not maxed');
+      }
+      assert(fn(), id + ' stat not applied');
+    }
+    applyOrCheck('nova', function () { return p.novaNeed <= 24; });
+    applyOrCheck('ricochet', function () { return p.stats.bounce >= 1; });
+    applyOrCheck('execution', function () { return p.stats.executeMult > 0; });
+    applyOrCheck('plating', function () { return p.stats.contactResist > 0; });
+    applyOrCheck('tempo', function () { return p.stats.comboWindow > 0; });
+    applyOrCheck('shrapnel', function () { return p.stats.shrapnel >= 3; });
   });
 
   step('pause menu: RESUME via Enter, SETTINGS via menu, Q quits', function () {

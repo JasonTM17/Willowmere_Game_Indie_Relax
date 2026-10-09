@@ -202,6 +202,7 @@
     game.bullets = [];
     game.enemyBullets = [];
     game.gems = [];
+    game.pickups = [];
     game.boss = null;
     game.score = 0;
     game.kills = 0;
@@ -300,9 +301,10 @@
     e.killHandled = true;
     game.kills += 1;
     game.combo += 1;
-    game.comboT = 2.0;
-    GP.addTrauma(0.05);                                // juice #1 kill shake
     var p = game.player;
+    game.comboT = 2.0 + (p.stats.comboWindow || 0);    // Tempo widens the window
+    p.novaCharge = Math.min(p.novaNeed, p.novaCharge + 1);   // every kill feeds the nova
+    GP.addTrauma(0.05);                                // juice #1 kill shake
     if (p.stats.lifestealPerKill > 0) {
       p.hp = Math.min(p.maxHp, p.hp + p.stats.lifestealPerKill);
     }
@@ -310,6 +312,18 @@
       p.refundDash(p.stats.flow);                      // Flow State refund
     }
     e.die();
+    // Shrapnel: kills fan out a ring of weak short-range fragments.
+    if (p.stats.shrapnel > 0) {
+      for (var sk = 0; sk < p.stats.shrapnel; sk++) {
+        var sa = GU.rand(0, GU.TAU);
+        if (game.bullets.length < 400) {
+          game.bullets.push(new GE.Bullet(game, e.x, e.y, sa, {
+            speed: 430, dmg: GE.PLAYER_BASE.dmg * p.stats.dmgMult * 0.35,
+            pierce: 0, radius: 3, range: 230, crit: false
+          }));
+        }
+      }
+    }
   }
 
   // Arc Web: lightning arcs from the hit enemy to the nearest chainTargets
@@ -357,6 +371,61 @@
     }
   }
 
+  // Ricochet: when a bullet would die at pierce-end, retarget it to the
+  // nearest un-hit enemy within 260 px. Returns true when it kept flying.
+  function tryRicochet(b) {
+    var st = game.player.stats;
+    if (!st.bounce || (b.bounced || 0) >= st.bounce) return false;
+    var cands = grid.query(b.x, b.y, 300, candB);
+    var best = null, bd = 260 * 260;
+    for (var i = 0; i < cands.length; i++) {
+      var e = cands[i];
+      if (e.dead || e.killHandled || b.hitSet.has(e.id)) continue;
+      var d2 = GU.dist2(b.x, b.y, e.x, e.y);
+      if (d2 < bd) { bd = d2; best = e; }
+    }
+    if (!best) return false;
+    b.dead = false;
+    b.bounced = (b.bounced || 0) + 1;
+    b.angle = GU.angleTo(b.x, b.y, best.x, best.y);
+    b.vx = Math.cos(b.angle) * b.speed;
+    b.vy = Math.sin(b.angle) * b.speed;
+    GP.bolt(b.x, b.y, best.x, best.y, '#aef6ff');
+    return true;
+  }
+
+  // Nova bomb (RMB / Shift): 200 dmg inside 150 px, clears enemy bullets
+  // inside 230 px. Charged by kills (player.novaCharge / novaNeed).
+  function tryNova() {
+    var p = game.player;
+    if (!p || p.dead || p.novaCharge < p.novaNeed) return;
+    p.novaCharge = 0;
+    GP.shockwave(p.x, p.y, '#ffd166', 230, 0.45);
+    GP.shockwave(p.x, p.y, '#ffffff', 150, 0.35);
+    GP.burst(p.x, p.y, { color: '#ffd166', count: 40, speed: [120, 380], life: [0.3, 0.6], size: 3 });
+    GP.addTrauma(0.4);
+    GA.nova();
+    GP.floatText(p.x, p.y - 30, 'NOVA', { color: '#ffd166', size: 18 });
+    var NOVA_R = 150;
+    var cands = grid.query(p.x, p.y, NOVA_R + 60, candB);
+    for (var i = 0; i < cands.length; i++) {
+      var e = cands[i];
+      if (e.dead || e.killHandled) continue;
+      var nr = NOVA_R + e.r;
+      if (GU.dist2(e.x, e.y, p.x, p.y) <= nr * nr) {
+        if (e.onHit(200, p.x, p.y, {})) handleKill(e);
+      }
+    }
+    for (i = 0; i < game.enemyBullets.length; i++) {
+      var eb = game.enemyBullets[i];
+      if (eb.dead) continue;
+      if (GU.dist2(eb.x, eb.y, p.x, p.y) <= 230 * 230) {
+        eb.dead = true;
+        GP.burst(eb.x, eb.y, { color: '#c86bff', count: 3, speed: 80, life: 0.2, size: 1.8 });
+      }
+    }
+  }
+
   function collide(edt) {
     var p = game.player;
     var st = p.stats;
@@ -373,13 +442,16 @@
         if (b.hitSet.has(e.id)) continue;
         var rr = b.radius + e.r;
         if (GU.dist2(b.x, b.y, e.x, e.y) > rr * rr) continue;
-        var died = e.onHit(b.dmg, b.x, b.y, { crit: b.crit });
+        // Execution: bonus damage against enemies under 30% HP.
+        var edmg = b.dmg;
+        if (st.executeMult > 0 && e.hp / e.maxHp < 0.3) edmg *= (1 + st.executeMult);
+        var died = e.onHit(edmg, b.x, b.y, { crit: b.crit });
         b.hitSet.add(e.id);
         doChain(e, b);
         var finalHit = false;
         if (b.pierce > 0) b.pierce -= 1;
         else { b.dead = true; finalHit = true; }
-        if (finalHit) doBoom(b, e);
+        if (finalHit && !tryRicochet(b)) doBoom(b, e);
         if (died) handleKill(e);
         if (b.dead) break;
       }
@@ -399,14 +471,24 @@
       }
     }
 
-    // 3) enemies x player contact (boss included)
+    // 3) enemies x player: contact damage (Plating resists a fraction) plus
+    //    the mite detonation AoE resolved exactly once per detonated mite.
     if (!p.dead) {
+      var resist = 1 - (st.contactResist || 0);
       for (i = 0; i < game.enemies.length; i++) {
         e = game.enemies[i];
+        if (e.detonated && !e.detonateDone) {          // mite blast, once
+          e.detonateDone = true;
+          var dr = e.detonateRadius + p.r;
+          if (GU.dist2(e.x, e.y, p.x, p.y) <= dr * dr) {
+            if (p.takeDamage(e.detonateDmg * resist, e.x, e.y)) startDeath();
+          }
+          continue;
+        }
         if (e.dead) continue;
         var cr = e.r + p.r;
         if (GU.dist2(e.x, e.y, p.x, p.y) <= cr * cr) {
-          if (p.takeDamage(e.dmg, e.x, e.y)) startDeath();
+          if (p.takeDamage(e.dmg * resist, e.x, e.y)) startDeath();
         }
       }
     }
@@ -427,6 +509,23 @@
     }
     // 5) regen lives in Player.update; 6) gem pickup lives in Gem.update;
     // 7) combo timer decay runs in stepPlaying (order per section 5.3).
+
+    // 8) power pickups x player (v2): walk over a pod to arm its timer.
+    if (!p.dead) {
+      for (i = 0; i < game.pickups.length; i++) {
+        var pk = game.pickups[i];
+        if (pk.dead) continue;
+        var pr = 16 + p.r;
+        if (GU.dist2(pk.x, pk.y, p.x, p.y) <= pr * pr) {
+          pk.dead = true;
+          var pdef = GE.PICKUP_TYPES[pk.kind];
+          p.pickups[pk.kind] = pdef.dur;
+          GA.power();
+          GP.burst(pk.x, pk.y, { color: pdef.color, count: 10, speed: 120, life: 0.3, size: 2.4 });
+          GP.floatText(pk.x, pk.y - 14, pdef.name, { color: pdef.color, size: 13 });
+        }
+      }
+    }
   }
 
   // Swap-remove dead entries; order within the array does not matter.
@@ -452,10 +551,12 @@
     grid.rebuild(game.enemies);
     collide(edt);
     for (i = 0; i < game.gems.length; i++) game.gems[i].update(edt);
+    for (i = 0; i < game.pickups.length; i++) game.pickups[i].update(edt);
     prune(game.enemies);
     prune(game.bullets);
     prune(game.enemyBullets);
     prune(game.gems);
+    prune(game.pickups);
     game.runTime += edt;
   }
 
@@ -504,6 +605,9 @@
     }
 
     if (GI.justPressed('Space')) game.player.tryDash();
+    if (GI.consumeRmb() || GI.justPressed('ShiftLeft') || GI.justPressed('ShiftRight')) {
+      tryNova();                                        // v2 nova bomb
+    }
 
     // Wave-start ripple (v2): grid brightens + a ring rolls off the player.
     if (GW.state.wave !== game.lastWave) {
@@ -787,6 +891,7 @@
       var p = g.player;
       var i;
       for (i = 0; i < g.gems.length; i++) g.gems[i].draw(ctx);
+      for (i = 0; i < g.pickups.length; i++) g.pickups[i].draw(ctx);
       p.drawAura(ctx);                                 // aura circle under enemies
       for (i = 0; i < g.enemies.length; i++) {
         if (!g.enemies[i].isBoss && !g.enemies[i].dead) g.enemies[i].draw(ctx);

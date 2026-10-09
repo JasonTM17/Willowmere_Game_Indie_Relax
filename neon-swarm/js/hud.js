@@ -450,7 +450,7 @@
         txt(ctx, 'COMBO x' + m.toFixed(1), 16, vh - 46, Math.round(15 * pulse), cc, 'left');
         glowOff(ctx);
         txt(ctx, String(game.combo), 130, vh - 46, 11, COL.faint, 'left');
-        bar(ctx, 16, vh - 38, 140, 5, game.comboT / 2.0, cc, 'rgba(255,255,255,0.2)');
+        bar(ctx, 16, vh - 38, 140, 5, game.comboT / (2.0 + (p.stats.comboWindow || 0)), cc, 'rgba(255,255,255,0.2)');
       }
 
       // Dash indicator bottom-right: r 18 ring fill + SPACE label

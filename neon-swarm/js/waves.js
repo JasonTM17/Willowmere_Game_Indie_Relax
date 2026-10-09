@@ -29,8 +29,14 @@
   var FIRST_SPAWN = 0.6;   // brief breath before the first spawn
 
   // Unlock wave + spawn weight per type (section 3.3 "Unlocks & weights").
-  var UNLOCK = { drone: 1, darter: 2, splitter: 3, spitter: 4, brute: 4 };
-  var WEIGHT = { drone: 50, darter: 20, splitter: 15, spitter: 10, brute: 8 };
+  var UNLOCK = { drone: 1, darter: 2, splitter: 3, spitter: 4, brute: 4, weaver: 6, mite: 7 };
+  var WEIGHT = { drone: 50, darter: 20, splitter: 15, spitter: 10, brute: 8, weaver: 12, mite: 14 };
+  // v2: elite chance by wave; surge windows compress the spawn interval.
+  var ELITE_CHANCE_LO = 0.06;   // waves 4-8
+  var ELITE_CHANCE_HI = 0.10;   // waves 9+
+  var SURGE_WAVES = { 8: true, 13: true };
+  var SURGE_LEN = 20;           // seconds of compressed spawning
+  var SURGE_MULT = 0.55;
 
   function viewSize(game) {
     var w = game.viewW, h = game.viewH;
@@ -56,7 +62,8 @@
       bossAlive: false,
       bossWarnT: 0,
       bossRef: null,
-      bossQueued: false
+      bossQueued: false,
+      surgeT: 0             // >0 while a surge window compresses spawn ticks
     },
 
     reset: function (game) {
@@ -68,6 +75,7 @@
       st.bossWarnT = 0;
       st.bossRef = null;
       st.bossQueued = false;
+      st.surgeT = 0;
       this._leakT = 0;
       if (game) {
         game.boss = null;
@@ -85,8 +93,9 @@
         speedMult: Math.min(1.55, 1 + 0.018 * (w - 1)),
         dmgMult: Math.min(2.0, 1 + 0.05 * (w - 1)),
         xpMult: 1 + 0.04 * (w - 1),
-        // x1.8 interval during a boss wave = ~55% spawn rate
-        spawnInterval: Math.max(0.16, 0.85 - 0.06 * (w - 1)) * (boss ? 1.8 : 1),
+        // x1.8 interval during a boss wave = ~55% spawn rate; surges x0.55.
+        spawnInterval: Math.max(0.16, 0.85 - 0.06 * (w - 1)) * (boss ? 1.8 : 1) *
+          (this.state.surgeT > 0 ? SURGE_MULT : 1),
         maxAlive: Math.min(140, 60 + 10 * w)
       };
     },
@@ -136,6 +145,9 @@
         if (st.bossWarnT <= 0) this._spawnBoss(game);
       }
 
+      // Surge window countdown (waves 8 and 13 open one via _onWaveStart).
+      if (st.surgeT > 0) st.surgeT -= dt;
+
       // Regular spawn ticks; over the alive cap the tick is skipped.
       var sc = this.scaling();
       st.spawnTimer -= dt;
@@ -173,7 +185,14 @@
       var k;
       for (k in UNLOCK) if (UNLOCK[k] === st.wave) fresh.push(k.toUpperCase());
       var text = 'WAVE ' + st.wave + (fresh.length ? ' \u00B7 NEW: ' + fresh.join(', ') : '');
-      if (typeof game.showBanner === 'function') game.showBanner(text);
+      if (SURGE_WAVES[st.wave]) {                    // v2 surge event
+        st.surgeT = SURGE_LEN;
+        if (typeof game.showBanner === 'function') {
+          game.showBanner('SURGE', 'THE SWARM THICKENS');
+        }
+      } else if (typeof game.showBanner === 'function') {
+        game.showBanner(text);
+      }
       // Every 5th wave: warning banner + alarm 1.5 s before the boss walks in.
       // If a previous boss is still alive, defer instead of overwriting
       // st.bossRef (that would orphan the old boss: no HUD bar, x1.8 off).
@@ -209,7 +228,10 @@
       var x = p ? p.x + Math.cos(a) * ring : Math.cos(a) * ring;
       var y = p ? p.y + Math.sin(a) * ring : Math.sin(a) * ring;
       var mult = { hpMult: sc.hpMult, speedMult: sc.speedMult, dmgMult: sc.dmgMult, xpMult: sc.xpMult };
-      game.enemies.push(new GE.Enemy(game, x, y, this.pickType(this.state.wave), mult));
+      // v2 elite roll: 6% from wave 4, 10% from wave 9.
+      var elite = this.state.wave >= 4 &&
+        Math.random() < (this.state.wave >= 9 ? ELITE_CHANCE_HI : ELITE_CHANCE_LO);
+      game.enemies.push(new GE.Enemy(game, x, y, this.pickType(this.state.wave), mult, elite));
     }
   };
 

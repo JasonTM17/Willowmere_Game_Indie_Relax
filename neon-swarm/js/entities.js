@@ -52,7 +52,8 @@
   };
 
   // Death particle counts (juice #3); burst uses speed 60-260 px/s, life 0.3-0.7 s.
-  var DEATH_PARTICLES = { drone: 8, darter: 10, splitter: 12, mini: 6, spitter: 10, brute: 16 };
+  var DEATH_PARTICLES = { drone: 8, darter: 10, splitter: 12, mini: 6, spitter: 10, brute: 16,
+                          weaver: 10, mite: 12 };
 
   var JITTER = 12 * DEG;   // +/-12 deg heading jitter (drone/mini packs)
   var SPIT_RANGE = 520;    // spitter only fires within this distance
@@ -81,7 +82,12 @@
     mini:     { hp: 8,  speed: 130, dmg: 4,  r: 7,  xp: 1, score: 5,  color: '#7dff5e', kbResist: 0 },
     spitter:  { hp: 26, speed: 70,  dmg: 6,  r: 10, xp: 3, score: 30, color: '#b26bff', kbResist: 0.1,
                 ringMin: 200, ringMax: 260, fireCd: 2.8, bulletSpeed: 150, bulletDmg: 10 },
-    brute:    { hp: 85, speed: 52,  dmg: 20, r: 20, xp: 5, score: 50, color: '#ff9f1c', kbResist: 0.7 }
+    brute:    { hp: 85, speed: 52,  dmg: 20, r: 20, xp: 5, score: 50, color: '#ff9f1c', kbResist: 0.7 },
+    // v2 additions
+    weaver:   { hp: 30, speed: 60,  dmg: 14, r: 12, xp: 4, score: 40, color: '#5b8cff', kbResist: 0.15,
+                aimTime: 0.9, telegraphTime: 0.3, dartSpeed: 420, dartTime: 0.35 },
+    mite:     { hp: 8,  speed: 175, dmg: 4,  r: 7,  xp: 2, score: 25, color: '#ff6b35', kbResist: 0,
+                fuseRange: 46, fuseTime: 0.5, boomRadius: 70, boomDmg: 14 }
   };
 
   GE.PLAYER_BASE = PLAYER_BASE;
@@ -321,9 +327,9 @@
     return g;
   };
 
-  // ---- Regular enemy (all 6 types, one class + per-type behavior) ------------
+  // ---- Regular enemy (all 8 types, one class + per-type behavior) ------------
   class Enemy {
-    constructor(game, x, y, typeName, mult) {
+    constructor(game, x, y, typeName, mult, elite) {
       var def = GE.ENEMY_TYPES[typeName];
       this.game = game;
       this.id = GU.uid();
@@ -346,6 +352,17 @@
       this.score = def.score;
       this.color = def.color;
       this.kbResist = def.kbResist || 0;
+      // v2 elite variants: bigger, harder, white-hot - they drop triple gems
+      // plus a guaranteed power pickup on death.
+      this.elite = !!elite;
+      if (this.elite) {
+        this.r = Math.round(this.r * 1.4);
+        this.maxHp = this.maxHp * 3;
+        this.hp = this.maxHp;
+        this.dmg = this.dmg * 1.5;
+        this.xp = this.xp * 3;
+        this.score = this.score * 3;
+      }
       this.flash = 0;
       this.kbX = 0;
       this.kbY = 0;
@@ -355,12 +372,17 @@
       this.jitter = 0;
       this.jitterT = GU.rand(0.1, 0.5);
       this.weavePhase = GU.rand(0, GU.TAU);
-      this.phase = 'cruise';                       // darter state machine
-      this.phaseT = def.cruiseTime || 0;
+      this.phase = 'cruise';                       // darter/weaver state machine
+      this.phaseT = def.cruiseTime || def.aimTime || 0;
       this.lungeAngle = 0;
+      this.dartCount = 0;                          // weaver zigzag alternation
       this.strafeDir = GU.chance(0.5) ? 1 : -1;    // spitter ring strafe
       this.strafeT = GU.rand(1.5, 3);
       this.fireTimer = def.fireCd ? def.fireCd * GU.rand(0.5, 1) : 0;
+      this.fuse = 0;                               // mite detonation fuse
+      this.detonated = false;                      // main resolves the AoE once
+      this.detonateRadius = def.boomRadius || 0;
+      this.detonateDmg = (def.boomDmg || 0) * mult.dmgMult * (this.elite ? 1.5 : 1);
       this.dead = false;
     }
 
@@ -446,6 +468,53 @@
             }
             break;
           }
+          case 'weaver': {
+            // aim (zigzag drift) -> windup (freeze + telegraph) -> lunge
+            this.phaseT -= dt;
+            if (this.phase === 'cruise') {
+              var lat = this.dartCount % 2 === 0 ? 1 : -1;   // alternate weave side
+              mvx = ux * this.speed - uy * this.speed * 0.8 * lat;
+              mvy = uy * this.speed + ux * this.speed * 0.8 * lat;
+              if (this.phaseT <= 0) { this.phase = 'windup'; this.phaseT = def.telegraphTime; }
+            } else if (this.phase === 'windup') {
+              this.lungeAngle = GU.angleTo(this.x, this.y, p.x, p.y);  // track till launch
+              this.aimAngle = this.lungeAngle;
+              if (this.phaseT <= 0) {
+                this.phase = 'lunge';
+                this.phaseT = def.dartTime;
+              }
+            } else {
+              this.aimAngle = this.lungeAngle;
+              mvx = Math.cos(this.lungeAngle) * def.dartSpeed;
+              mvy = Math.sin(this.lungeAngle) * def.dartSpeed;
+              if (this.phaseT <= 0) {
+                this.phase = 'cruise';
+                this.phaseT = def.aimTime;
+                this.dartCount++;
+              }
+            }
+            break;
+          }
+          case 'mite': {
+            // fast chase; inside fuseRange it locks and arms a 0.5 s fuse.
+            // The AoE itself is resolved by main (single collision authority).
+            if (this.fuse > 0) {
+              this.fuse -= dt;
+              if (this.fuse <= 0) {
+                this.detonated = true;
+                this.dead = true;
+                GP.burst(this.x, this.y, { color: this.color, count: 14, speed: [80, 240], life: [0.25, 0.5], size: 3 });
+                GP.shockwave(this.x, this.y, this.color, this.detonateRadius, 0.3);
+                GP.addTrauma(0.25);
+                GA.explode();
+              }
+              break;
+            }
+            mvx = ux * this.speed;
+            mvy = uy * this.speed;
+            if (d <= def.fuseRange) this.fuse = def.fuseTime;
+            break;
+          }
         }
       }
 
@@ -490,7 +559,16 @@
       }
       GA.kill();
       this.game.addScore(Math.round(this.score * killMult(this.game)));
-      Gem.spawn(this.game, this.x, this.y, this.xp);
+      if (this.elite) {                          // triple gem fan + a power pickup
+        for (var gi = 0; gi < 3; gi++) {
+          var ga = this.aimAngle + (gi - 1) * 0.5;
+          Gem.spawn(this.game, this.x + Math.cos(ga) * 18, this.y + Math.sin(ga) * 18, this.xp);
+        }
+        Pickup.spawn(this.game, this.x, this.y);
+        GP.shockwave(this.x, this.y, '#ffffff', 70, 0.3);
+      } else {
+        Gem.spawn(this.game, this.x, this.y, this.xp);
+      }
       if (this.typeName === 'splitter') {                    // 2 minis at +/-30 deg
         var es = this.game.enemies || (this.game.enemies = []);
         for (var i = -1; i <= 1; i += 2) {
@@ -589,6 +667,68 @@
           ctx.stroke();
           break;
         }
+        case 'weaver': {                          // slim double-chevron; telegraphs
+          if (this.phase === 'windup') {          // dashed lunge preview line
+            ctx.save();
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.strokeStyle = 'rgba(91,140,255,0.4)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(this.lungeAngle) * 150, Math.sin(this.lungeAngle) * 150);
+            ctx.stroke();
+            ctx.restore();
+          }
+          var ww = this.phase === 'windup' ? 1 - this.phaseT / this.type.telegraphTime : 0;
+          ctx.rotate(this.aimAngle);
+          ctx.fillStyle = this.color;
+          ctx.beginPath();
+          ctx.moveTo(this.r * 1.9, 0);
+          ctx.lineTo(-this.r * 0.7, this.r * 0.95);
+          ctx.lineTo(-this.r * 0.2, 0);
+          ctx.lineTo(-this.r * 0.7, -this.r * 0.95);
+          ctx.closePath();
+          ctx.fill();
+          var weaverGlow = Math.min(1, flashA + ww * 0.8);
+          if (weaverGlow > 0) { ctx.fillStyle = 'rgba(255,255,255,' + weaverGlow + ')'; ctx.fill(); }
+          break;
+        }
+        case 'mite': {                            // spiky ball; fuse expands a ring
+          ctx.rotate(this.spin * 3);
+          ctx.fillStyle = this.color;
+          ctx.beginPath();
+          for (var mi = 0; mi < 6; mi++) {
+            var ma = mi * GU.TAU / 6;
+            var mo = this.r, mi2 = this.r * 0.5;
+            var ma2 = ma + GU.TAU / 12;
+            if (mi === 0) ctx.moveTo(Math.cos(ma) * mo, Math.sin(ma) * mo);
+            else ctx.lineTo(Math.cos(ma) * mo, Math.sin(ma) * mo);
+            ctx.lineTo(Math.cos(ma2) * mi2, Math.sin(ma2) * mi2);
+          }
+          ctx.closePath();
+          ctx.fill();
+          if (flashA > 0) { ctx.fillStyle = 'rgba(255,255,255,' + flashA + ')'; ctx.fill(); }
+          if (this.fuse > 0) {                    // detonation telegraph
+            var fp = 1 - this.fuse / this.type.fuseTime;
+            ctx.save();
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.strokeStyle = 'rgba(255,107,53,' + (0.3 + 0.5 * fp) + ')';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.detonateRadius * fp, 0, GU.TAU);
+            ctx.stroke();
+            ctx.restore();
+          }
+          break;
+        }
+      }
+      if (this.elite) {                           // pulsing white halo marker
+        ctx.strokeStyle = 'rgba(255,255,255,' + (0.45 + 0.3 * Math.sin(this.t * 6)) + ')';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.r + 4, 0, GU.TAU);
+        ctx.stroke();
       }
       ctx.restore();
     }
@@ -629,6 +769,13 @@
       this.volleyOffset = GU.rand(0, GU.TAU);
       this.addTimer = 9;
       this.adds = [];                            // boss-spawned drones
+      // v2 escalation: n>=2 aimed bursts; n>=3 spiral (enrage) + telegraphed charge
+      this.aimedTimer = 2.6;
+      this.spiralTimer = 0;
+      this.spiralA = GU.rand(0, GU.TAU);
+      this.chargeState = 'idle';                 // idle -> windup -> dash -> idle
+      this.chargeT = 6;
+      this.chargeAngle = 0;
       this.dead = false;
     }
 
@@ -660,9 +807,31 @@
       if (p) {
         var dx = p.x - this.x, dy = p.y - this.y;
         var d = Math.sqrt(dx * dx + dy * dy) || 1;
+
+        // n>=3: telegraphed charge dash. windup freezes it while it locks the
+        // aim line, then a fast straight dash that can flank a parked player.
+        var charging = false;
+        if (this.n >= 3) {
+          this.chargeT -= dt;
+          if (this.chargeState === 'idle') {
+            if (this.chargeT <= 0 && d < 520) { this.chargeState = 'windup'; this.chargeT = 0.6; }
+          } else if (this.chargeState === 'windup') {
+            charging = true;
+            this.chargeAngle = GU.angleTo(this.x, this.y, p.x, p.y);
+            if (this.chargeT <= 0) { this.chargeState = 'dash'; this.chargeT = 0.5; }
+          } else {
+            charging = true;
+            this.x += Math.cos(this.chargeAngle) * 300 * dt;
+            this.y += Math.sin(this.chargeAngle) * 300 * dt;
+            if (this.chargeT <= 0) { this.chargeState = 'idle'; this.chargeT = 7; }
+          }
+        }
+
         var sp = this.phase === 2 ? this.enragedSpeed : this.speed;
-        this.x += (dx / d * sp + this.kbX) * dt;
-        this.y += (dy / d * sp + this.kbY) * dt;
+        if (!charging) {
+          this.x += (dx / d * sp + this.kbX) * dt;
+          this.y += (dy / d * sp + this.kbY) * dt;
+        }
 
         // radial bullet burst: 14 violet bullets, rotating offset each volley
         this.volleyTimer -= dt;
@@ -675,6 +844,32 @@
               this.volleyOffset + k * (GU.TAU / 14), 170, 10), 200);
           }
           GP.addTrauma(0.25);                    // juice #1
+        }
+
+        // n>=2: aimed 3-burst on a faster cycle - the Sovereign aims back.
+        if (this.n >= 2) {
+          this.aimedTimer -= dt;
+          if (this.aimedTimer <= 0) {
+            this.aimedTimer = this.volleyInterval() * 0.55;
+            var ba = GU.angleTo(this.x, this.y, p.x, p.y);
+            var eb2 = this.game.enemyBullets || (this.game.enemyBullets = []);
+            for (var k2 = -1; k2 <= 1; k2++) {
+              pushCapped(eb2, new EnemyBullet(this.game, this.x, this.y,
+                ba + k2 * 0.11, 195, 12), 200);
+            }
+          }
+        }
+
+        // n>=3: while enraged it also weaves a slow spiral under everything else.
+        if (this.n >= 3 && this.phase === 2) {
+          this.spiralTimer -= dt;
+          this.spiralA += dt * 4;
+          if (this.spiralTimer <= 0) {
+            this.spiralTimer = 0.22;
+            var eb3 = this.game.enemyBullets || (this.game.enemyBullets = []);
+            pushCapped(eb3, new EnemyBullet(this.game, this.x, this.y,
+              this.spiralA, 150, 10), 200);
+          }
         }
 
         // enrage: 4 drone adds every 9 s, max 8 boss adds alive
@@ -729,12 +924,32 @@
       GP.hitstop(100);
       GP.addTrauma(0.4);
       GA.bossDie();
+      Pickup.spawn(this.game, this.x, this.y);      // Sovereigns drop loot
       this.game.addScore(Math.round(this.score * killMult(this.game)));
     }
 
     draw(ctx) {
       ctx.save();
       ctx.translate(this.x, this.y);
+      if (this.chargeState === 'windup') {        // telegraphed charge line
+        ctx.strokeStyle = 'rgba(255,49,49,0.55)';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([10, 8]);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(Math.cos(this.chargeAngle) * 260, Math.sin(this.chargeAngle) * 260);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      if (this.chargeState === 'dash') {          // dash motion trail
+        ctx.strokeStyle = 'rgba(255,49,49,0.35)';
+        ctx.lineWidth = this.r * 1.4;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(-Math.cos(this.chargeAngle) * this.r * 3,
+                   -Math.sin(this.chargeAngle) * this.r * 3);
+        ctx.stroke();
+      }
       ctx.shadowColor = this.color;
       ctx.shadowBlur = 18;                       // allowed on boss (glow policy)
       // octagon body
@@ -794,9 +1009,17 @@
         magnetMult: 1, regen: 0,
         bulletSpeedMult: 1, bulletSizeMult: 1,
         auraDps: 0, auraRadius: 0,
-        critChance: 0.05, xpMult: 1
+        critChance: 0.05, xpMult: 1,
+        // v2 card stats: bounce retargets at pierce-end; execute/Plating are
+        // defensive ratios; comboWindow/shrapnel feed main's kill bookkeeping.
+        bounce: 0, executeMult: 0, contactResist: 0, comboWindow: 0, shrapnel: 0
       };
       this.upStacks = {};
+      // v2 nova bomb: kills charge it; main owns the blast (collision authority)
+      this.novaCharge = 0;
+      this.novaNeed = 30;
+      // v2 timed power pickups; aegis is a one-hit shield with a lifespan
+      this.pickups = { overdrive: 0, havoc: 0, surge: 0, aegis: 0 };
       this.fireTimer = 0;
       this.dashTimer = 0;
       this.dashCd = 0;
@@ -814,7 +1037,7 @@
     }
 
     effectiveSpeed() {
-      return PLAYER_BASE.speed * this.stats.speedMult;
+      return PLAYER_BASE.speed * this.stats.speedMult * (this.pickups.surge > 0 ? 1.35 : 1);
     }
 
     // True while dashing or within 0.4 s after a dash ends (flow upgrade).
@@ -845,7 +1068,7 @@
       this.dashVY = dir.y * sp;
       this.dashTimer = PLAYER_BASE.dashTime;
       this.iFrames = Math.max(this.iFrames, PLAYER_BASE.dashIframes);
-      this.dashCd = PLAYER_BASE.dashCd * this.stats.dashCdMult;
+      this.dashCd = PLAYER_BASE.dashCd * this.stats.dashCdMult * (this.pickups.surge > 0 ? 0.4 : 1);
       this.dashGraceT = 0;
       this.ghostT = 0;
       GA.dash();
@@ -858,7 +1081,7 @@
       var m = this.game.mouseWorld();
       this.facing = GU.angleTo(this.x, this.y, m.x, m.y);
       var st = this.stats;
-      var s = st.shots;
+      var s = st.shots + (this.pickups.havoc > 0 ? 2 : 0);
       var tipX = this.x + Math.cos(this.facing) * 16;
       var tipY = this.y + Math.sin(this.facing) * 16;
       var arr = this.game.bullets || (this.game.bullets = []);
@@ -883,6 +1106,17 @@
     // direction arc at the attacker. Returns whether this hit killed.
     takeDamage(n, srcX, srcY) {
       if (this.iFrames > 0 || this.dead) return false;
+      if (this.pickups.aegis > 0) {              // AEGIS eats exactly one hit
+        this.pickups.aegis = 0;
+        this.iFrames = 0.5;                       // brief mercy window after the pop
+        if (srcX !== undefined) {
+          this.lastHitDir = GU.angleTo(this.x, this.y, srcX, srcY);
+          this.lastHitT = 0.55;
+        }
+        GP.shockwave(this.x, this.y, '#39ff14', 40, 0.25);
+        GA.shieldHit();
+        return false;
+      }
       this.hp = Math.max(0, this.hp - n);
       this.iFrames = PLAYER_BASE.hitIframes;
       this.hurtFlashT = 0.15;                 // red blink + vignette pulse
@@ -933,6 +1167,13 @@
         case 'crit': st.critChance = Math.min(0.60, st.critChance + 0.10); break;
         case 'greedy': st.xpMult *= 1.25; break;
         case 'heal': this.hp = Math.min(this.maxHp, this.hp + 30); break;  // fallback card
+        // ---- v2 cards ------------------------------------------------------
+        case 'nova': this.novaNeed = Math.max(12, this.novaNeed - 6); break;
+        case 'ricochet': st.bounce += 1; break;
+        case 'execution': st.executeMult += 0.18; break;
+        case 'plating': st.contactResist = Math.min(0.45, st.contactResist + 0.15); break;
+        case 'tempo': st.comboWindow += 0.7; break;
+        case 'shrapnel': st.shrapnel = st.shrapnel === 0 ? 3 : st.shrapnel + 2; break;
         default: return false;
       }
       return true;
@@ -953,10 +1194,15 @@
         this.x += axis.x * this.effectiveSpeed() * dt;
         this.y += axis.y * this.effectiveSpeed() * dt;
       }
-      this.dashCd = Math.max(0, this.dashCd - dt);
+      // SURGE also triples dash cooldown recovery while it lasts
+      this.dashCd = Math.max(0, this.dashCd - dt * (this.pickups.surge > 0 ? 3 : 1));
       this.iFrames = Math.max(0, this.iFrames - dt);
       this.hurtFlashT = Math.max(0, this.hurtFlashT - dt);
       this.lastHitT = Math.max(0, this.lastHitT - dt);
+      // timed power pickups decay here so LEVELUP/pause freeze them too
+      for (var pk in this.pickups) {
+        if (this.pickups[pk] > 0) this.pickups[pk] = Math.max(0, this.pickups[pk] - dt);
+      }
       if (this.stats.regen > 0 && this.hp < this.maxHp) {
         this.hp = Math.min(this.maxHp, this.hp + this.stats.regen * dt);
       }
@@ -968,7 +1214,8 @@
         this.fireTimer -= dt;
         if (this.fireTimer <= 0) {
           this.shoot();
-          this.fireTimer += 1 / (PLAYER_BASE.fireRate * this.stats.fireRateMult);
+          this.fireTimer += 1 / (PLAYER_BASE.fireRate * this.stats.fireRateMult *
+            (this.pickups.overdrive > 0 ? 1.6 : 1));
         }
       } else {
         this.fireTimer = 0;                               // first shot instant on press
@@ -1016,10 +1263,81 @@
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.r, 0, GU.TAU);
       ctx.stroke();
+      if (this.pickups.aegis > 0) {               // AEGIS shield bubble
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = 'rgba(57,255,20,' + (0.55 + 0.25 * Math.sin(this.animT * 6)) + ')';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.r + 7, this.animT * 1.5, this.animT * 1.5 + GU.TAU);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
       ctx.restore();
     }
   }
   GE.Player = Player;
+
+  // ---- Power pickup (v2): hex pod dropped by elites/bosses --------------------
+  // Kinds: overdrive (+fire rate), havoc (+shots), surge (+speed/dash), aegis
+  // (one-hit shield). Effects live on player.pickups as seconds remaining.
+  var PICKUP_TYPES = {
+    overdrive: { color: '#35e6ff', label: 'OVR', dur: 12, name: 'OVERDRIVE' },
+    havoc:     { color: '#ff2d95', label: 'HVC', dur: 12, name: 'HAVOC' },
+    surge:     { color: '#ffb300', label: 'SRG', dur: 12, name: 'SURGE' },
+    aegis:     { color: '#39ff14', label: 'AEG', dur: 20, name: 'AEGIS' }
+  };
+  GE.PICKUP_TYPES = PICKUP_TYPES;
+  var PICKUP_CAP = 32;
+
+  class Pickup {
+    constructor(game, x, y, kind) {
+      this.game = game;
+      this.x = x;
+      this.y = y;
+      this.kind = kind || GU.pick(Object.keys(PICKUP_TYPES));
+      this.t = GU.rand(0, GU.TAU);
+      this.ttl = 15;                              // pod decays on the ground
+      this.dead = false;
+    }
+
+    update(dt) {
+      this.t += dt;
+      this.ttl -= dt;
+      if (this.ttl <= 0) this.dead = true;
+    }
+
+    draw(ctx) {
+      var def = PICKUP_TYPES[this.kind];
+      var bob = Math.sin(this.t * 3) * 3;
+      var blink = this.ttl < 4 && Math.floor(this.t * 8) % 2 === 0;   // expiring
+      ctx.save();
+      ctx.translate(this.x, this.y + bob);
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = blink ? 0.35 : 1;
+      ctx.strokeStyle = def.color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();                            // hex pod
+      for (var i = 0; i < 6; i++) {
+        var a = i * GU.TAU / 6 + this.t * 0.6;
+        if (i === 0) ctx.moveTo(Math.cos(a) * 10, Math.sin(a) * 10);
+        else ctx.lineTo(Math.cos(a) * 10, Math.sin(a) * 10);
+      }
+      ctx.closePath();
+      ctx.stroke();
+      ctx.fillStyle = def.color;
+      ctx.font = 'bold 7px "Courier New", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(def.label, 0, 0);
+      ctx.restore();
+    }
+  }
+  GE.Pickup = Pickup;
+  Pickup.spawn = function (game, x, y, kind) {
+    var arr = game.pickups || (game.pickups = []);
+    if (arr.length < PICKUP_CAP) arr.push(new Pickup(game, x, y, kind));
+  };
 
   window.GameEntities = GE;
 })();
