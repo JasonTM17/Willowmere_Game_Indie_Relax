@@ -601,7 +601,6 @@
         break;
       case ST.PLAYING:
         HUD.drawPlaying(ctx, game);
-        drawCrosshair();
         HUD.drawBanners(ctx, game);
         break;
       case ST.LEVELUP:
@@ -617,7 +616,8 @@
         HUD.drawGameOver(ctx, game);
         break;
     }
-  }
+    drawCrosshair();                                 // OS cursor is hidden (css): the
+  }                                                  // game owns the pointer everywhere
 
   // ---- loop + global events ------------------------------------------------------
 

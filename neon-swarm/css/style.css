@@ -65,9 +65,9 @@ canvas#game {
   display: block;
   position: fixed;
   inset: 0;
-  /* The game draws its own crosshair while playing; the native crosshair
-     cursor keeps menus usable without duplicating the in-game one. */
-  cursor: crosshair;
+  /* The game draws its own crosshair in EVERY state (v2), so the native
+     cursor is hidden everywhere - one consistent pointer. */
+  cursor: none;
   outline: none;
 }
 
