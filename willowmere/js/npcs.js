@@ -676,9 +676,12 @@ window.WNpcs = (function () {
      (lastCam is only the fallback when a caller omits it).
      Raw (translated) callers use drawBody / rawChar. */
   function rawChar(ctx, x, y, dir, frame, row) {
-    var col = (DIR_COL[dir] || 0) * 3 + (frame % 3);
+    var col = DIR_COL[dir] || 0;
     if (window.WAssets && WAssets.has('chars')) {
-      WAssets.sheet(ctx, 'chars', col * 32, row * 48, 32, 48, x - 16, y - 48, 32, 48);
+      /* chars.png is 4 cols x 9 rows: one 32x48 frame per direction
+         (down/left/right/up); 'frame' gives a 1px step bob while walking */
+      WAssets.sheet(ctx, 'chars', col * 32, row * 48, 32, 48,
+        x - 16, y - 48 - ((frame % 2) ? 1 : 0), 32, 48);
       return;
     }
     /* vector fallback: shadow, coat, head, face by direction */

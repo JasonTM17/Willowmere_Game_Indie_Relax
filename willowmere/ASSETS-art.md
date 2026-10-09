@@ -49,10 +49,11 @@ còn trống (trong suốt).
 | rock | 288,0,32,32 | Roguelike ô (5,12) |
 | flowers | 320,0,32,32 | Roguelike ô (25,11) hoa cúc |
 
-### chars.png — 384×432, 9 hàng × 12 cột, khung 32×48
+### chars.png — 384×432, 9 hàng × 4 cột, khung 32×48
 
-Thứ tự hướng trong mỗi hàng: **xuống (0–2), trái (3–5), phải (6–8), lên (9–11)**,
-mỗi hướng 3 frame bước chân (frame 0 = frame đứng khi đứng yên).
+Thứ tự hướng trong mỗi hàng: **xuống (0), trái (1), phải (2), lên (3)** — mỗi
+hướng một frame; bước đi mô phỏng bằng nhịp bob 1 px trong `npcs.js:rawChar`.
+(Cột 4–11 của canvas 384 px để trống — giữ kích thước file cho khớp manifest.)
 
 | Hàng | Nhân vật | Sheet nguồn (Puny Characters) |
 |---|---|---|
