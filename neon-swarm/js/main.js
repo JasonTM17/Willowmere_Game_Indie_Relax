@@ -308,7 +308,7 @@
   }
 
   function doGameOver() {
-    var isNew = !game.best || game.score > game.best.score;
+    var isNew = game.score > 0 && (!game.best || game.score > game.best.score);
     var rec = {
       score: game.score,
       wave: GW.state.wave,
