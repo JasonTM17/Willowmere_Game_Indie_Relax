@@ -548,6 +548,15 @@
       var mY = vh * 0.52;
       var endY = drawMenu(ctx, game.titleItems || [], game.titleSel, cxm, mY, { lineH: 38, w: 300 });
 
+      // CODEX badge: unviewed unlocks pulse beside the menu.
+      if (window.GameCodex && GameCodex.newCount() > 0) {
+        var pulse = 0.6 + 0.4 * Math.sin(game.clock * 5);
+        ctx.globalAlpha = pulse;
+        txt(ctx, '+' + GameCodex.newCount() + ' NEW', cxm + 170, mY + 38 + 19, 11,
+          COL.gold, 'left', 'middle');
+        ctx.globalAlpha = 1;
+      }
+
       if (game.best) {
         txt(ctx, 'BEST ' + GU.fmt(Math.floor(game.best.score)) + '  ·  WAVE ' + (game.best.wave || 1) +
           '  ·  ' + GU.formatTime(game.best.time || 0), cxm, endY + 34, 13, COL.crit, 'center');
@@ -738,6 +747,112 @@
       }
       ctx.globalAlpha = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(game.clock * 4));
       txt(ctx, 'CLICK TO RETRY  ·  T FOR TITLE', vw / 2, by + (s.isNewBest ? 74 : 44), 16, COL.white, 'center');
+      ctx.globalAlpha = 1;
+    },
+
+    // ---- PROLOGUE (v2 story): slow typewriter over the dark grid ---------------
+    drawPrologue: function (ctx, game) {
+      var vw = game.viewW;
+      var vh = game.viewH;
+      var GC = window.GameCodex;
+      dim(ctx, vw, vh, 0.55);
+      txt(ctx, 'SECTOR 0 — DEFENSE PROTOCOL, CYCLE ' +
+        (game.best ? game.best.wave || 1 : 1), vw / 2, vh * 0.22, 11, COL.faint, 'center');
+      if (!GC) return;
+      var y0 = vh * 0.38;
+      for (var i = 0; i < GC.PROLOGUE.length; i++) {
+        var line = GC.PROLOGUE[i];
+        var shown = i < game.prolLine ? line
+          : (i === game.prolLine ? line.slice(0, Math.floor(game.prolChars)) : '');
+        var col = i === GC.PROLOGUE.length - 1 ? COL.cyan : COL.white;
+        txt(ctx, shown, vw / 2, y0 + i * 40, 17, col, 'center');
+      }
+      ctx.globalAlpha = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(game.clock * 5));
+      txt(ctx, 'PRESS ANY KEY', vw / 2, vh - 44, 11, COL.faint, 'center');
+      ctx.globalAlpha = 1;
+    },
+
+    // ---- CODEX (v2 story): the recovered archive --------------------------------
+    drawCodex: function (ctx, game) {
+      var vw = game.viewW;
+      var vh = game.viewH;
+      var GC = window.GameCodex;
+      dim(ctx, vw, vh, 0.8);
+      glowOn(ctx, COL.cyan, 18);
+      txtL(ctx, 'CODEX ARCHIVE', vw / 2, vh * 0.13, 28, COL.cyan, 'center', '6px');
+      glowOff(ctx);
+      if (!GC) return;
+      var done = GC.unlockedCount();
+      txt(ctx, done + ' / ' + GC.ENTRIES.length + ' SIGNALS RECOVERED',
+        vw / 2, vh * 0.13 + 30, 12, COL.dim, 'center');
+
+      var lineH = 54;
+      var listH = Math.floor((vh * 0.62) / lineH);
+      var sel = game.codexSel;
+      var top = GU.clamp(sel - Math.floor(listH / 2), 0, Math.max(0, GC.ENTRIES.length - listH));
+      var y0 = vh * 0.24;
+      for (var i = top; i < Math.min(GC.ENTRIES.length, top + listH); i++) {
+        var e = GC.ENTRIES[i];
+        var y = y0 + (i - top) * lineH;
+        var unlocked = GC.unlocked(e.id);
+        var isSel = i === sel;
+        var isNew = unlocked && !GC.data.seen[e.id];
+        if (isSel) {
+          ctx.fillStyle = COL.sel;
+          ctx.fillRect(vw / 2 - 310, y - 17, 620, lineH - 6);
+        }
+        txt(ctx, unlocked ? e.title : '· ENCRYPTED SIGNAL ·', vw / 2 - 290, y,
+          13, unlocked ? (isSel ? COL.white : COL.cyan) : COL.faint, 'left', 'middle');
+        if (isNew) txt(ctx, 'NEW', vw / 2 + 286, y - 12, 9, COL.gold, 'right');
+        var body = unlocked ? e.body : 'Signal not yet recovered. Keep running.';
+        var lines = wrapText(body, 74);
+        txt(ctx, lines[0] || '', vw / 2 - 290, y + 16, 10,
+          unlocked ? COL.dim : COL.faint, 'left', 'middle');
+      }
+      // scroll edge markers
+      if (top > 0) txt(ctx, '▲', vw / 2 + 320, y0 - 8, 10, COL.dim, 'center');
+      if (top + listH < GC.ENTRIES.length) {
+        txt(ctx, '▼', vw / 2 + 320, y0 + listH * lineH - 12, 10, COL.dim, 'center');
+      }
+      txt(ctx, '↑↓ BROWSE  ·  ESC / ENTER — BACK', vw / 2, vh - 34, 12, COL.faint, 'center');
+    },
+
+    // ---- ENDING (v2 story): DAWN BREAKS over the frozen battlefield -------------
+    drawEnding: function (ctx, game) {
+      var vw = game.viewW;
+      var vh = game.viewH;
+      // warm dawn wash rising from the bottom
+      var grad = ctx.createLinearGradient(0, vh, 0, vh * 0.35);
+      grad.addColorStop(0, 'rgba(255,179,0,0.30)');
+      grad.addColorStop(1, 'rgba(255,179,0,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, vw, vh);
+      dim(ctx, vw, vh, 0.35);
+
+      var wob = Math.sin(game.animT * 1.4) * 2;
+      txt(ctx, 'DAWN BREAKS', vw / 2 - 2 - wob, vh * 0.3, 52, COL.magenta, 'center');
+      txt(ctx, 'DAWN BREAKS', vw / 2 + 2 + wob, vh * 0.3, 52, COL.gold, 'center');
+      glowOn(ctx, COL.gold, 26);
+      txt(ctx, 'DAWN BREAKS', vw / 2, vh * 0.3, 52, COL.ink, 'center');
+      glowOff(ctx);
+
+      var lines = [
+        'THE LAST SHADOW FALLS.',
+        'SECTOR BY SECTOR, THE LIGHT RETURNS.',
+        'THE DAWN PROTOCOL IS COMPLETE — THE GRID REMEMBERS YOU, LUX-1.'
+      ];
+      for (var i = 0; i < lines.length; i++) {
+        ctx.globalAlpha = GU.clamp((game.clock * 2 - i * 0.9) * 0.5, 0, 1);
+        txt(ctx, lines[i], vw / 2, vh * 0.44 + i * 30, 15, COL.white, 'center');
+      }
+      ctx.globalAlpha = 1;
+
+      txt(ctx, 'RUN ' + GU.formatTime(game.runTime) + '  ·  WAVE ' + GW.state.wave +
+        '  ·  ' + GU.fmt(Math.floor(game.score)), vw / 2, vh * 0.58, 13, COL.gold, 'center');
+
+      ctx.globalAlpha = 0.5 + 0.5 * (0.5 + 0.5 * Math.sin(game.clock * 4));
+      txt(ctx, 'ENTER — ENDLESS PROTOCOL   ·   ESC — TITLE', vw / 2, vh * 0.7, 15,
+        COL.white, 'center');
       ctx.globalAlpha = 1;
     }
   };

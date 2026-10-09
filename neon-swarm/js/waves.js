@@ -191,7 +191,9 @@
           game.showBanner('SURGE', 'THE SWARM THICKENS');
         }
       } else if (typeof game.showBanner === 'function') {
-        game.showBanner(text);
+        var GC = window.GameCodex;                   // wave whispers (v2 story)
+        var wh = GC && GC.whisper ? GC.whisper(st.wave) : null;
+        game.showBanner(text, wh);
       }
       // Every 5th wave: warning banner + alarm 1.5 s before the boss walks in.
       // If a previous boss is still alive, defer instead of overwriting
@@ -205,7 +207,10 @@
     _queueBossWarning: function (game) {
       var st = this.state;
       st.bossWarnT = BOSS_WARN;
-      if (typeof game.showBanner === 'function') game.showBanner('BOSS INCOMING');
+      var GC = window.GameCodex;              // runtime-only dep (loaded later)
+      var n = Math.max(1, Math.floor(st.wave / BOSS_EVERY));
+      var line = GC && GC.bossLine ? GC.bossLine(n) : null;
+      if (typeof game.showBanner === 'function') game.showBanner('BOSS INCOMING', line);
       GA.bossWarn();
     },
 
@@ -214,6 +219,8 @@
       var p = game.player;
       var n = Math.max(1, Math.floor(st.wave / BOSS_EVERY));  // boss count
       var boss = new GE.Boss(game, p ? p.x : 0, p ? p.y - 500 : -500, n);
+      var GC = window.GameCodex;
+      if (GC && GC.bossTitle) boss.title = GC.bossTitle(n);   // HUD boss-bar name
       game.enemies.push(boss);
       game.boss = boss;              // convenience ref for the HUD boss bar
       st.bossAlive = true;

@@ -31,7 +31,7 @@ const JS_DIR = path.join(GAME_DIR, 'js');
 /* Script order is the contract from index.html / DESIGN.md §5.1. */
 const ORDER = [
   'util', 'audio', 'input', 'particles', 'entities',
-  'waves', 'upgrades', 'hud', 'main'
+  'waves', 'upgrades', 'codex', 'hud', 'main'
 ];
 
 /* ============================ stubs ============================ */
@@ -197,7 +197,7 @@ function main() {
 
   const g = globalThis;
   const Game = g.Game, GI = g.GameInput, GE = g.GameEntities, GW = g.GameWaves,
-        GV = g.GameUpgrades;
+        GV = g.GameUpgrades, GC = g.GameCodex;
 
   step('boot: game object, rAF captured, TITLE state', function () {
     assert(Game && typeof Game === 'object', 'window.Game missing — main.js did not run');
@@ -211,11 +211,26 @@ function main() {
     assert(Game.state === 0, 'state drifted from TITLE without input');
   });
 
-  step('TITLE menu: Down+Enter on SETTINGS -> SETTINGS state', function () {
+  step('TITLE menu: Down+Enter on CODEX -> archive screen', function () {
     assert(Game.titleSel === 0, 'titleSel should start at 0 (START RUN)');
     GI.pressedThisFrame.add('ArrowDown');
     pump(1);
-    assert(Game.titleSel === 1, 'menu nav did not move to SETTINGS');
+    assert(Game.titleSel === 1, 'menu nav did not move to CODEX');
+    GI.pressedThisFrame.add('Enter');
+    pump(1);
+    assert(Game.state === 7, 'expected CODEX (7), got ' + Game.state);
+    GI.pressedThisFrame.add('ArrowDown');          // browse the list
+    pump(1);
+    assert(Game.codexSel === 1, 'codex scroll did not move');
+    GI.pressedThisFrame.add('Escape');             // back to TITLE
+    pump(1);
+    assert(Game.state === 0, 'codex back did not return to TITLE, got ' + Game.state);
+  });
+
+  step('TITLE menu: Down+Enter on SETTINGS -> SETTINGS state', function () {
+    GI.pressedThisFrame.add('ArrowDown');          // sel was 1 -> 2 = SETTINGS
+    pump(1);
+    assert(Game.titleSel === 2, 'menu nav did not reach SETTINGS');
     GI.pressedThisFrame.add('Enter');
     pump(1);
     assert(Game.state === 5, 'expected SETTINGS (5), got ' + Game.state);
@@ -235,15 +250,24 @@ function main() {
     assert(Game.state === 0, 'BACK did not return to TITLE, got ' + Game.state);
   });
 
-  step('Enter on START RUN -> PLAYING', function () {
-    assert(Game.state === 0 && Game.titleSel === 1,
+  step('START RUN -> PROLOGUE (first run) -> PLAYING', function () {
+    assert(Game.state === 0 && Game.titleSel === 2,
       'expected TITLE with selection remembered on SETTINGS');
+    GI.pressedThisFrame.add('ArrowUp');       // 2 -> 1
+    pump(1);
     GI.pressedThisFrame.add('ArrowUp');       // 1 -> 0 = START RUN
     pump(1);
     GI.pressedThisFrame.add('Enter');
     pump(1);
-    assert(Game.state === 1, 'expected PLAYING (1), got ' + Game.state);
+    assert(Game.state === 6, 'expected PROLOGUE (6) on first run, got ' + Game.state);
+    // mash through the 4 typewriter lines (fill, then advance)
+    for (var i = 0; i < 10 && Game.state === 6; i++) {
+      GI.pressedThisFrame.add('Space');
+      pump(1);
+    }
+    assert(Game.state === 1, 'prologue did not hand off to PLAYING, got ' + Game.state);
     assert(Game.player && !Game.player.dead, 'player missing after startRun');
+    assert(GC.data.seenPrologue === true, 'seenPrologue flag not persisted');
   });
 
   step('2 s in: enemies spawned on the ring', function () {
@@ -413,6 +437,27 @@ function main() {
     applyOrCheck('plating', function () { return p.stats.contactResist > 0; });
     applyOrCheck('tempo', function () { return p.stats.comboWindow > 0; });
     applyOrCheck('shrapnel', function () { return p.stats.shrapnel >= 3; });
+  });
+
+  step('story: killing the third Sovereign fires the DAWN ending', function () {
+    while (Game.state === 2) Game.pickUpgrade(0);   // ensure world is running
+    const p = Game.player;
+    p.hp = p.maxHp;
+    const boss = new GE.Boss(Game, p.x, p.y - 60, 3);
+    boss.hp = 1;
+    Game.enemies.push(boss);
+    Game.boss = boss;
+    GW.state.bossAlive = true;
+    // a real bullet collision so main's handleKill records lastBossN
+    Game.bullets.push(new GE.Bullet(Game, boss.x, boss.y, 0, { dmg: 99999 }));
+    pump(4);
+    assert(Game.lastBossN === 3, 'boss n=3 kill not recorded, got ' + Game.lastBossN);
+    assert(Game.state === 8, 'expected ENDING (8), got ' + Game.state);
+    assert(GC.unlocked('victory') && GC.data.won, 'victory not recorded in codex');
+    GI.pressedThisFrame.add('Enter');
+    pump(1);
+    assert(Game.state === 1 && Game.endless === true,
+      'ENDLESS protocol did not resume PLAYING');
   });
 
   step('pause menu: RESUME via Enter, SETTINGS via menu, Q quits', function () {

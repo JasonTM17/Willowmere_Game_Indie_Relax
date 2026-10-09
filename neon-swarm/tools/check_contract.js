@@ -29,7 +29,7 @@ const JS_DIR = path.join(__dirname, '..', 'js');
 /* The contract scripts in index.html load order. */
 const EXPECTED = [
   'util.js', 'audio.js', 'input.js', 'particles.js', 'entities.js',
-  'waves.js', 'upgrades.js', 'hud.js', 'main.js'
+  'waves.js', 'upgrades.js', 'codex.js', 'hud.js', 'main.js'
 ];
 
 /* Line-start module syntax + bare token usages (executable code only). */

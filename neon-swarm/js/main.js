@@ -16,11 +16,13 @@
   var GE = window.GameEntities;
   var GW = window.GameWaves;
   var GV = window.GameUpgrades;
+  var GC = window.GameCodex;
   var HUD = window.GameHUD;
 
   var BEST_KEY = 'neon-swarm.best';
   var SETTINGS_KEY = 'neon-swarm.settings';
-  var ST = { TITLE: 0, PLAYING: 1, LEVELUP: 2, PAUSED: 3, GAMEOVER: 4, SETTINGS: 5 };
+  var ST = { TITLE: 0, PLAYING: 1, LEVELUP: 2, PAUSED: 3, GAMEOVER: 4, SETTINGS: 5,
+             PROLOGUE: 6, CODEX: 7, ENDING: 8 };
   var MIN_W = 800;
   var MIN_H = 600;
 
@@ -102,6 +104,7 @@
     settingsFrom: ST.TITLE,          // where SETTINGS returns to
     titleItems: [
       { label: 'START RUN' },
+      { label: 'CODEX' },
       { label: 'SETTINGS' }
     ],
     pauseItems: [
@@ -123,6 +126,14 @@
     levelUpShownAt: 0,
     overShownAt: 0,
     epitaph: null,                   // set by the story layer (v2)
+
+    // v2 story state
+    prolLine: 0,                     // prologue typewriter position
+    prolChars: 0,
+    codexSel: 0,                     // codex list scroll position
+    lastBossN: 0,                    // n of the most recently killed boss
+    dawnBroken: false,               // DAWN ending already fired this run
+    endless: false,                  // continuing past the victory threshold
 
     mouseWorld: function () {
       return { x: GI.mouse.x + cam.x, y: GI.mouse.y + cam.y };
@@ -218,6 +229,9 @@
     game.deathT = 0;
     game.runTime = 0;
     game.overStats = null;
+    game.lastBossN = 0;
+    game.dawnBroken = false;
+    game.endless = false;
     cam.x = game.player.x - viewW / 2;                 // camera follow (5.3)
     cam.y = game.player.y - viewH / 2;
     HUD.clearBanners();
@@ -230,6 +244,32 @@
     game.titleSel = 0;
     game.fadeT = 0.3;
     game.state = ST.TITLE;
+  }
+
+  // START RUN entry: the prologue typewriter runs once ever (persisted);
+  // every later run goes straight to PLAYING.
+  function enterRun() {
+    if (!GC.data.seenPrologue) {
+      game.prolLine = 0;
+      game.prolChars = 0;
+      game.state = ST.PROLOGUE;
+      game.fadeT = 0.3;
+    } else {
+      startRun();
+    }
+  }
+
+  // The third Sovereign (boss n>=3, wave 15) dying fires the DAWN ending.
+  // main owns this check; the run may then continue as Endless Protocol.
+  function startEnding() {
+    game.dawnBroken = true;
+    GC.unlock('victory');
+    GC.data.won = true;
+    GC.save();
+    GA.stopMusic();
+    GA.dawn();
+    game.fadeT = 0.6;
+    game.state = ST.ENDING;
   }
 
   function showLevelUp() {
@@ -284,6 +324,8 @@
       time: rec.time, wave: rec.wave, level: rec.level,
       kills: rec.kills, score: rec.score, isNewBest: isNew
     };
+    GC.unlock('firstDeath');
+    game.epitaph = GC.epitaph(game.overStats);
     game.dying = false;
     game.overShownAt = game.clock;                     // stats count-up timer
     GA.stopMusic();
@@ -301,6 +343,10 @@
     e.killHandled = true;
     game.kills += 1;
     game.combo += 1;
+    // Story: first kill of each species / first elite / each Sovereign.
+    if (e.isBoss) { game.lastBossN = e.n || 0; GC.unlock('boss'); }
+    else GC.unlock(e.typeName);
+    if (e.elite) GC.unlock('elite');
     var p = game.player;
     game.comboT = 2.0 + (p.stats.comboWindow || 0);    // Tempo widens the window
     p.novaCharge = Math.min(p.novaNeed, p.novaCharge + 1);   // every kill feeds the nova
@@ -400,6 +446,7 @@
     var p = game.player;
     if (!p || p.dead || p.novaCharge < p.novaNeed) return;
     p.novaCharge = 0;
+    GC.unlock('nova');
     GP.shockwave(p.x, p.y, '#ffd166', 230, 0.45);
     GP.shockwave(p.x, p.y, '#ffffff', 150, 0.35);
     GP.burst(p.x, p.y, { color: '#ffd166', count: 40, speed: [120, 380], life: [0.3, 0.6], size: 3 });
@@ -520,6 +567,7 @@
           pk.dead = true;
           var pdef = GE.PICKUP_TYPES[pk.kind];
           p.pickups[pk.kind] = pdef.dur;
+          GC.unlock('pickup');
           GA.power();
           GP.burst(pk.x, pk.y, { color: pdef.color, count: 10, speed: 120, life: 0.3, size: 2.4 });
           GP.floatText(pk.x, pk.y - 14, pdef.name, { color: pdef.color, size: 13 });
@@ -614,6 +662,9 @@
       game.lastWave = GW.state.wave;
       game.gridPulseT = 0.9;
       GP.shockwave(game.player.x, game.player.y, '#35e6ff', 420, 0.7);
+      // Story triggers: wave milestones + the surge archive entries.
+      GC.unlock('wave' + game.lastWave);
+      if (game.lastWave === 8 || game.lastWave === 13) GC.unlock('surge');
     }
     game.gridPulseT = Math.max(0, game.gridPulseT - dt);
 
@@ -625,6 +676,12 @@
 
     var edt = dt * GP.getTimeScale();                  // hitstop / slow-mo scale
     updateWorld(edt);
+
+    // Victory check: the wave-15 Sovereign just fell -> DAWN ending.
+    if (game.lastBossN >= 3 && !game.dawnBroken && !game.dying) {
+      startEnding();
+      return;
+    }
     GP.update(edt);
     HUD.update(dt);
 
@@ -653,12 +710,16 @@
         var pick = (tc >= 0) ? tc : ((confirm || tc === -2) ? game.titleSel : -1);
         if (pick >= 0 && pick < ti.length && !ti[pick].disabled) {
           GA.uiSelect();
-          if (ti[pick].label === 'SETTINGS') {
+          var label = ti[pick].label;
+          if (label === 'SETTINGS') {
             game.settingsFrom = ST.TITLE;
             game.settingsSel = 0;
             game.state = ST.SETTINGS;
+          } else if (label === 'CODEX') {
+            game.codexSel = 0;
+            game.state = ST.CODEX;
           } else {
-            startRun();
+            enterRun();
           }
         }
         HUD.update(dt);
@@ -743,6 +804,55 @@
         GP.update(dt);                                 // only GP runs (5.3): death explosion
         if (GI.consumeClick() || GI.justPressed('Enter')) startRun();
         else if (GI.justPressed('KeyT')) toTitle();
+        break;
+
+      case ST.PROLOGUE: {
+        // Typewriter: 45 chars/s; any key/click completes or advances a line.
+        var line = GC.PROLOGUE[game.prolLine];
+        game.prolChars += dt * 45;
+        var advance = GI.consumeClick() || GI.pressedThisFrame.size > 0;
+        if (advance) {
+          if (game.prolChars < line.length) {
+            game.prolChars = line.length;              // first press: fill the line
+          } else {
+            game.prolLine += 1;
+            game.prolChars = 0;
+            GA.uiSelect();
+            if (game.prolLine >= GC.PROLOGUE.length) {
+              GC.data.seenPrologue = true;
+              GC.save();
+              startRun();
+            }
+          }
+        }
+        HUD.update(dt);
+        break;
+      }
+
+      case ST.CODEX: {
+        game.codexSel = menuNav(game.codexSel, GC.ENTRIES.length);
+        if (GI.justPressed('Escape') || GI.justPressed('Enter') ||
+            GI.justPressed('Space')) {
+          GC.markViewed();
+          GA.uiSelect();
+          game.state = ST.TITLE;
+        }
+        HUD.update(dt);
+        break;
+      }
+
+      case ST.ENDING:
+        GP.update(dt * 0.5);                           // embers drift behind the dawn
+        if (GI.justPressed('Enter') || GI.justPressed('Space')) {
+          game.endless = true;
+          GA.startMusic();
+          game.showBanner('ENDLESS PROTOCOL', 'THE LIGHT HOLDS — RUN FOREVER');
+          GP.shockwave(game.player.x, game.player.y, '#ffd166', 500, 0.8);
+          game.state = ST.PLAYING;
+        } else if (GI.justPressed('Escape')) {
+          toTitle();
+        }
+        HUD.update(dt);
         break;
     }
   }
@@ -950,6 +1060,16 @@
       case ST.GAMEOVER:
         HUD.drawPlaying(ctx, game);
         HUD.drawGameOver(ctx, game);
+        break;
+      case ST.PROLOGUE:
+        HUD.drawPrologue(ctx, game);
+        break;
+      case ST.CODEX:
+        HUD.drawCodex(ctx, game);
+        break;
+      case ST.ENDING:
+        HUD.drawPlaying(ctx, game);                    // frozen victory field behind
+        HUD.drawEnding(ctx, game);
         break;
     }
     drawCrosshair();                                 // OS cursor is hidden (css): the
