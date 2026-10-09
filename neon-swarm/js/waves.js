@@ -48,6 +48,7 @@
   }
 
   var GW = {
+    WAVE_LEN: WAVE_LEN,          // exposed for the HUD wave-progress bar (v2)
     state: {
       wave: 1,
       waveTimer: 0,

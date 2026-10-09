@@ -807,6 +807,8 @@
       this.dashGraceT = 0;                      // > 0 within 0.4 s after a dash (flow window)
       this.ghostT = 0;
       this.hurtFlashT = 0;                      // red blink timer; main draws the vignette
+      this.lastHitDir = 0;                      // damage-direction indicator (v2 HUD)
+      this.lastHitT = 0;
       this.animT = 0;
       this.dead = false;
     }
@@ -877,12 +879,17 @@
     }
 
     // Any hit (contact or enemy bullet) triggers 0.6 s global i-frames; no
-    // damage stacks during them. Returns whether this hit killed the player.
-    takeDamage(n) {
+    // damage stacks during them. srcX/srcY (optional) aim the HUD damage-
+    // direction arc at the attacker. Returns whether this hit killed.
+    takeDamage(n, srcX, srcY) {
       if (this.iFrames > 0 || this.dead) return false;
       this.hp = Math.max(0, this.hp - n);
       this.iFrames = PLAYER_BASE.hitIframes;
       this.hurtFlashT = 0.15;                 // red blink + vignette pulse
+      if (srcX !== undefined) {
+        this.lastHitDir = GU.angleTo(this.x, this.y, srcX, srcY);
+        this.lastHitT = 0.55;
+      }
       GP.addTrauma(0.15);                     // juice #1
       GP.hitstop(60);                         // juice #2
       GA.hurt();
@@ -949,6 +956,7 @@
       this.dashCd = Math.max(0, this.dashCd - dt);
       this.iFrames = Math.max(0, this.iFrames - dt);
       this.hurtFlashT = Math.max(0, this.hurtFlashT - dt);
+      this.lastHitT = Math.max(0, this.lastHitT - dt);
       if (this.stats.regen > 0 && this.hp < this.maxHp) {
         this.hp = Math.min(this.maxHp, this.hp + this.stats.regen * dt);
       }

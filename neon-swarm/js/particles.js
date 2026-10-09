@@ -42,6 +42,7 @@
   var hitstopUntil = 0; // wall-clock ms (performance.now)
   var slowmoScale = 1;
   var slowmoUntil = 0;
+  var shakeEnabled = true; // settings toggle: trauma still accrues, offsets zero
 
   function makeParticle() {
     return {
@@ -224,6 +225,9 @@
       trauma = GU.clamp(trauma + amount, 0, 1);
     },
 
+    // Settings toggle (screen shake on/off).
+    setShakeEnabled: function (v) { shakeEnabled = !!v; },
+
     // timeScale = 0 for this wall-time duration (juice #2).
     hitstop: function (ms) {
       var until = performance.now() + ms;
@@ -297,8 +301,13 @@
       // Trauma decay 1.2/s; shake = trauma^2, offset within +/-12 px.
       trauma = Math.max(0, trauma - 1.2 * dt);
       var s = trauma * trauma;
-      GP.shakeX = GU.rand(-12, 12) * s;
-      GP.shakeY = GU.rand(-12, 12) * s;
+      if (shakeEnabled) {
+        GP.shakeX = GU.rand(-12, 12) * s;
+        GP.shakeY = GU.rand(-12, 12) * s;
+      } else {
+        GP.shakeX = 0;
+        GP.shakeY = 0;
+      }
     },
 
     // World-space rendering; the caller supplies the camera transform.

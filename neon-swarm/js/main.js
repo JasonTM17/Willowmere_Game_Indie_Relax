@@ -19,7 +19,8 @@
   var HUD = window.GameHUD;
 
   var BEST_KEY = 'neon-swarm.best';
-  var ST = { TITLE: 0, PLAYING: 1, LEVELUP: 2, PAUSED: 3, GAMEOVER: 4 };
+  var SETTINGS_KEY = 'neon-swarm.settings';
+  var ST = { TITLE: 0, PLAYING: 1, LEVELUP: 2, PAUSED: 3, GAMEOVER: 4, SETTINGS: 5 };
   var MIN_W = 800;
   var MIN_H = 600;
 
@@ -44,6 +45,24 @@
     var b = GU.storage.get(BEST_KEY);
     if (b && typeof b.score === 'number' && isFinite(b.score)) return b;
     return null;
+  }
+
+  // Settings (v2): persisted, applied to audio/particles/HUD on change.
+  function loadSettings() {
+    var s = GU.storage.get(SETTINGS_KEY);
+    var d = { music: 7, sfx: 8, shake: true, scanlines: true, minimap: true };
+    if (s && typeof s === 'object') {
+      for (var k in d) if (s[k] !== undefined) d[k] = s[k];
+    }
+    return d;
+  }
+
+  function applySettings() {
+    var s = game.settings;
+    GA.setMusicVolume(s.music / 10);
+    GA.setSfxVolume(s.sfx / 10);
+    GP.setShakeEnabled(s.shake);
+    GU.storage.set(SETTINGS_KEY, s);
   }
 
   var game = {
@@ -75,6 +94,36 @@
     overStats: null,
     best: null,
 
+    // v2 screens/navigation state
+    settings: loadSettings(),
+    titleSel: 0,
+    pauseSel: 0,
+    settingsSel: 0,
+    settingsFrom: ST.TITLE,          // where SETTINGS returns to
+    titleItems: [
+      { label: 'START RUN' },
+      { label: 'SETTINGS' }
+    ],
+    pauseItems: [
+      { label: 'RESUME' },
+      { label: 'SETTINGS' },
+      { label: 'QUIT TO TITLE' }
+    ],
+    settingsItems: [
+      { label: 'MUSIC', kind: 'slider', key: 'music' },
+      { label: 'SFX', kind: 'slider', key: 'sfx' },
+      { label: 'SCREEN SHAKE', kind: 'toggle', key: 'shake' },
+      { label: 'SCANLINES', kind: 'toggle', key: 'scanlines' },
+      { label: 'MINIMAP', kind: 'toggle', key: 'minimap' },
+      { label: 'BACK', kind: 'back' }
+    ],
+    fadeT: 0,                        // state-transition fade, seconds remaining
+    gridPulseT: 0,                   // wave-start ripple across the grid
+    lastWave: 1,
+    levelUpShownAt: 0,
+    overShownAt: 0,
+    epitaph: null,                   // set by the story layer (v2)
+
     mouseWorld: function () {
       return { x: GI.mouse.x + cam.x, y: GI.mouse.y + cam.y };
     },
@@ -83,7 +132,7 @@
       return Math.min(3, 1 + 0.1 * Math.floor(game.combo / 10));
     },
 
-    showBanner: function (text) { HUD.showBanner(text); },
+    showBanner: function (text, sub) { HUD.showBanner(text, sub); },
 
     // Killers already applied the combo multiplier (entities.js); never x2 here.
     addScore: function (n) { game.score += n; },
@@ -145,6 +194,9 @@
   function startRun() {
     GP.reset();
     GW.reset(game);
+    game.fadeT = 0.3;
+    game.gridPulseT = 0;
+    game.lastWave = 1;
     game.player = new GE.Player(game, 0, 0);
     game.enemies = [];
     game.bullets = [];
@@ -174,11 +226,14 @@
 
   function toTitle() {
     GA.stopMusic();
+    game.titleSel = 0;
+    game.fadeT = 0.3;
     game.state = ST.TITLE;
   }
 
   function showLevelUp() {
     game.levelUpCards = GV.roll3(game.player);
+    game.levelUpShownAt = game.clock;                  // card deal-in timer
     game.state = ST.LEVELUP;                           // world freezes; cards in
   }
 
@@ -229,8 +284,10 @@
       kills: rec.kills, score: rec.score, isNewBest: isNew
     };
     game.dying = false;
+    game.overShownAt = game.clock;                     // stats count-up timer
     GA.stopMusic();
     GA.gameOver();
+    game.fadeT = 0.3;
     game.state = ST.GAMEOVER;
   }
 
@@ -337,7 +394,7 @@
         if (GU.dist2(eb.x, eb.y, p.x, p.y) <= er * er) {
           if (p.iFrames > 0) continue;     // dash/hurt i-frames: pass through (2.1)
           eb.dead = true;
-          if (p.takeDamage(eb.dmg)) startDeath();
+          if (p.takeDamage(eb.dmg, eb.x, eb.y)) startDeath();
         }
       }
     }
@@ -349,7 +406,7 @@
         if (e.dead) continue;
         var cr = e.r + p.r;
         if (GU.dist2(e.x, e.y, p.x, p.y) <= cr * cr) {
-          if (p.takeDamage(e.dmg)) startDeath();
+          if (p.takeDamage(e.dmg, e.x, e.y)) startDeath();
         }
       }
     }
@@ -404,6 +461,30 @@
 
   // ---- per-state steps ---------------------------------------------------------
 
+  // Menu helpers: selection index wraps on ↑↓/W S; menuClick returns the
+  // clicked item index, -2 when the click landed off-menu, -1 no click.
+  function menuNav(sel, count) {
+    if (GI.justPressed('ArrowUp') || GI.justPressed('KeyW')) return (sel + count - 1) % count;
+    if (GI.justPressed('ArrowDown') || GI.justPressed('KeyS')) return (sel + 1) % count;
+    return sel;
+  }
+
+  function menuClick() {
+    if (!GI.consumeClick()) return -1;
+    var mx = GI.mouse.x;
+    var my = GI.mouse.y;
+    for (var i = 0; i < HUD.menuRects.length; i++) {
+      var r = HUD.menuRects[i];
+      if (mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h) return r.i;
+    }
+    return -2;
+  }
+
+  function backFromSettings() {
+    game.state = game.settingsFrom;
+    GA.uiSelect();
+  }
+
   function stepPlaying(dt) {
     if (GI.justPressed('KeyP') || GI.justPressed('Escape')) {   // PLAYING -> PAUSED
       game.state = ST.PAUSED;
@@ -424,6 +505,14 @@
 
     if (GI.justPressed('Space')) game.player.tryDash();
 
+    // Wave-start ripple (v2): grid brightens + a ring rolls off the player.
+    if (GW.state.wave !== game.lastWave) {
+      game.lastWave = GW.state.wave;
+      game.gridPulseT = 0.9;
+      GP.shockwave(game.player.x, game.player.y, '#35e6ff', 420, 0.7);
+    }
+    game.gridPulseT = Math.max(0, game.gridPulseT - dt);
+
     // Level-up trigger: after the 0.35 s slow-mo, freeze into the card screen.
     if (game.pendingLevels > 0) {
       if (game.levelUpDelay > 0) game.levelUpDelay -= dt;
@@ -443,16 +532,34 @@
 
   function step(dt) {
     game.clock += dt;
+    game.fadeT = Math.max(0, game.fadeT - dt);         // transition overlay decay
     if (GI.justPressed('KeyM')) GA.toggleMute();       // any state (section 2.1)
 
     switch (game.state) {
-      case ST.TITLE:
+      case ST.TITLE: {
         game.titleT += dt;
         cam.x = Math.sin(game.titleT * 0.06) * 480;    // slow drift over the grid
         cam.y = game.titleT * 16;
-        if (GI.consumeClick() || GI.justPressed('Enter') || GI.justPressed('Space')) startRun();
+        var ti = game.titleItems;
+        var prev = game.titleSel;
+        game.titleSel = menuNav(game.titleSel, ti.length);
+        if (game.titleSel !== prev) GA.uiSelect();
+        var tc = menuClick();                          // >=0 item, -2 off-menu, -1 none
+        var confirm = GI.justPressed('Enter') || GI.justPressed('Space');
+        var pick = (tc >= 0) ? tc : ((confirm || tc === -2) ? game.titleSel : -1);
+        if (pick >= 0 && pick < ti.length && !ti[pick].disabled) {
+          GA.uiSelect();
+          if (ti[pick].label === 'SETTINGS') {
+            game.settingsFrom = ST.TITLE;
+            game.settingsSel = 0;
+            game.state = ST.SETTINGS;
+          } else {
+            startRun();
+          }
+        }
         HUD.update(dt);
         break;
+      }
 
       case ST.PLAYING:
         stepPlaying(dt);
@@ -481,10 +588,52 @@
         if (GI.justPressed('KeyP') || GI.justPressed('Escape')) {
           game.state = ST.PLAYING;
           GA.uiSelect();
+          break;
+        }
+        game.pauseSel = menuNav(game.pauseSel, game.pauseItems.length);
+        var pc = menuClick();
+        var pp = (pc >= 0) ? pc : (GI.justPressed('Enter') ? game.pauseSel : -1);
+        if (pp >= 0 && pp < game.pauseItems.length) {
+          GA.uiSelect();
+          if (pp === 0) game.state = ST.PLAYING;
+          else if (pp === 1) {
+            game.settingsFrom = ST.PAUSED;
+            game.settingsSel = 0;
+            game.state = ST.SETTINGS;
+          }
+          else toTitle();
         } else if (GI.justPressed('KeyQ')) {
           toTitle();
         }
         break;
+
+      case ST.SETTINGS: {
+        var items = game.settingsItems;
+        var prevS = game.settingsSel;
+        game.settingsSel = menuNav(game.settingsSel, items.length);
+        if (game.settingsSel !== prevS) GA.uiSelect();
+        var mc = menuClick();
+        if (mc >= 0 && mc < items.length) game.settingsSel = mc;
+        var it = items[game.settingsSel];
+        var left = GI.justPressed('ArrowLeft') || GI.justPressed('KeyA');
+        var right = GI.justPressed('ArrowRight') || GI.justPressed('KeyD');
+        var act = GI.justPressed('Enter') || (mc === game.settingsSel && mc >= 0);
+        if (it.kind === 'slider' && (left || right)) {
+          game.settings[it.key] = GU.clamp(game.settings[it.key] + (right ? 1 : -1), 0, 10);
+          applySettings();
+          GA.uiSelect();
+        } else if (it.kind === 'toggle' && (left || right || act)) {
+          game.settings[it.key] = !game.settings[it.key];
+          applySettings();
+          GA.uiSelect();
+        } else if (it.kind === 'back' && act) {
+          backFromSettings();
+          break;
+        }
+        if (GI.justPressed('Escape')) backFromSettings();
+        HUD.update(dt);
+        break;
+      }
 
       case ST.GAMEOVER:
         GP.update(dt);                                 // only GP runs (5.3): death explosion
@@ -496,11 +645,48 @@
 
   // ---- rendering ---------------------------------------------------------------
 
+  // Dead-grid skyline: a slow parallax layer (0.06) of silhouette blocks with
+  // a few lit windows, deterministic per 512 px tile (v2).
+  function drawSkyline() {
+    var T = 512;
+    var ox = cam.x * 0.06;
+    var oy = cam.y * 0.06;
+    var tx0 = Math.floor(ox / T) - 1;
+    var ty0 = Math.floor(oy / T) - 1;
+    var tw = Math.ceil(viewW / T) + 3;
+    var th = Math.ceil(viewH / T) + 3;
+    for (var ty = ty0; ty <= ty0 + th; ty++) {
+      for (var tx = tx0; tx <= tx0 + tw; tx++) {
+        var rng = GU.mulberry32(((tx * 73856093) ^ (ty * 19349663) ^ 0x9e3779b9) >>> 0);
+        var bx = tx * T - ox;
+        var by = ty * T - oy;
+        var n = 2 + Math.floor(rng() * 3);
+        for (var i = 0; i < n; i++) {
+          var bw = 44 + rng() * 96;
+          var bh = 60 + rng() * 170;
+          var bxp = bx + rng() * (T - bw);
+          var byp = by + rng() * (T - bh);
+          ctx.fillStyle = 'rgba(9,9,26,0.8)';
+          ctx.fillRect(bxp, byp, bw, bh);
+          ctx.strokeStyle = 'rgba(53,230,255,0.05)';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(bxp + 0.5, byp + 0.5, bw - 1, bh - 1);
+          var lit = Math.floor(rng() * 4);
+          for (var w = 0; w < lit; w++) {
+            ctx.fillStyle = 'rgba(53,230,255,' + (0.05 + rng() * 0.10).toFixed(3) + ')';
+            ctx.fillRect(bxp + 6 + rng() * (bw - 14), byp + 8 + rng() * (bh - 18), 3, 4);
+          }
+        }
+      }
+    }
+  }
+
   function drawGrid() {                                // 48 px neon grid (juice #8)
     var gs = 48;
     var x0 = Math.floor(cam.x / gs) * gs;
     var y0 = Math.floor(cam.y / gs) * gs;
-    ctx.strokeStyle = 'rgba(90,40,200,0.18)';
+    var pulse = game.gridPulseT > 0 ? game.gridPulseT * 0.3 : 0;   // wave-start flash
+    ctx.strokeStyle = 'rgba(90,40,200,' + (0.18 + pulse).toFixed(3) + ')';
     ctx.lineWidth = 1;
     ctx.beginPath();
     var x, y;
@@ -534,6 +720,38 @@
     ctx.globalAlpha = 1;
   }
 
+  // Scanline overlay (settings.scanlines): a cached 1x4 pattern, hand-rolled
+  // line pass as fallback when createPattern is unavailable.
+  var scanPattern = null;
+  function drawScanlines() {
+    if (!game.settings.scanlines) return;
+    if (scanPattern === null) {
+      scanPattern = false;
+      if (document.createElement && ctx.createPattern) {
+        var c = document.createElement('canvas');
+        c.width = 1;
+        c.height = 4;
+        var c2 = c.getContext && c.getContext('2d');
+        if (c2) {
+          c2.fillStyle = 'rgba(0,0,0,0.55)';
+          c2.fillRect(0, 3, 1, 1);
+          var pat = ctx.createPattern(c, 'repeat');
+          if (pat) scanPattern = pat;
+        }
+      }
+    }
+    ctx.save();
+    if (scanPattern) {
+      ctx.globalAlpha = 0.4;
+      ctx.fillStyle = scanPattern;
+      ctx.fillRect(0, 0, viewW, viewH);
+    } else {
+      ctx.fillStyle = 'rgba(0,0,0,0.05)';
+      for (var y = 3; y < viewH; y += 4) ctx.fillRect(0, y, viewW, 1);
+    }
+    ctx.restore();
+  }
+
   function drawCrosshair() {                           // cyan ring + 4 ticks, x1.3 firing
     var x = GI.mouse.x;
     var y = GI.mouse.y;
@@ -560,10 +778,11 @@
 
     ctx.save();
     ctx.translate(-cam.x + GP.shakeX, -cam.y + GP.shakeY);   // world layer only
+    drawSkyline();                                     // v2 parallax silhouettes
     drawGrid();
     drawStars(0.15, 20, 1, '#9fd8ff');                 // far layer: 20 pts, r 1
     drawStars(0.35, 10, 1.6, '#ffffff');               // near layer: 10 pts, r 1.6
-    if (game.state !== ST.TITLE) {
+    if (game.state !== ST.TITLE && game.player) {   // a run exists to draw
       var g = game;
       var p = g.player;
       var i;
@@ -583,6 +802,14 @@
     // Screen-space overlays: hurt vignette, boss warning pulse, base vignette.
     if (game.state === ST.PLAYING && game.player && game.player.hurtFlashT > 0) {
       ctx.globalAlpha = Math.min(1, game.player.hurtFlashT / 0.15);   // juice #4
+      ctx.fillStyle = hurtVignette;
+      ctx.fillRect(0, 0, viewW, viewH);
+      ctx.globalAlpha = 1;
+    }
+    // Low-HP heartbeat vignette below 30% (v2).
+    if (game.state === ST.PLAYING && game.player && !game.player.dead &&
+        game.player.hp / game.player.maxHp < 0.3) {
+      ctx.globalAlpha = 0.10 + 0.06 * Math.sin(game.animT * 6);
       ctx.fillStyle = hurtVignette;
       ctx.fillRect(0, 0, viewW, viewH);
       ctx.globalAlpha = 1;
@@ -611,13 +838,23 @@
         HUD.drawPlaying(ctx, game);
         HUD.drawPause(ctx, game);
         break;
+      case ST.SETTINGS:
+        if (game.player) HUD.drawPlaying(ctx, game);   // dim run behind pause settings
+        HUD.drawSettings(ctx, game);
+        break;
       case ST.GAMEOVER:
         HUD.drawPlaying(ctx, game);
         HUD.drawGameOver(ctx, game);
         break;
     }
     drawCrosshair();                                 // OS cursor is hidden (css): the
-  }                                                  // game owns the pointer everywhere
+                                                     // game owns the pointer everywhere
+    drawScanlines();                                 // v2 CRT flavor (settings)
+    if (game.fadeT > 0) {                            // state-transition fade
+      ctx.fillStyle = 'rgba(3,3,12,' + (game.fadeT / 0.3).toFixed(3) + ')';
+      ctx.fillRect(0, 0, viewW, viewH);
+    }
+  }
 
   // ---- loop + global events ------------------------------------------------------
 
@@ -659,5 +896,6 @@
   GI.bind(canvas);
   GP.init(600);
   game.best = loadBest();
+  applySettings();                                     // persisted audio/visual prefs
   requestAnimationFrame(frame);
 })();

@@ -20,6 +20,8 @@
   var noiseBuf = null; // shared 1 s white-noise buffer
   var muted = false;
   var inited = false;
+  var sfxVol = 1;        // 0..1 straight into sfxBus (settings screen)
+  var musicVol = 0.5;    // 0..1 straight into musicBus (kept low vs sfx)
 
   // Voice cap: max 12 starts in any 80 ms window, then skip silently.
   // Applied to SFX; the music scheduler is periodic by design and bypasses it.
@@ -145,10 +147,10 @@
       master.gain.value = muted ? 0 : 0.9;
       master.connect(ctx.destination);
       sfxBus = ctx.createGain();
-      sfxBus.gain.value = 1;
+      sfxBus.gain.value = sfxVol;
       sfxBus.connect(master);
       musicBus = ctx.createGain();
-      musicBus.gain.value = 0.5; // keep total music gain low
+      musicBus.gain.value = musicVol; // keep total music gain low
       musicBus.connect(master);
       noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
       var d = noiseBuf.getChannelData(0);
@@ -173,6 +175,19 @@
       if (master) master.gain.value = muted ? 0 : 0.9;
       return muted;
     },
+
+    // Settings sliders (0..1). Safe before init: the values are applied
+    // when the buses are created.
+    setSfxVolume: function (v) {
+      sfxVol = GU.clamp(v, 0, 1);
+      if (sfxBus) sfxBus.gain.value = sfxVol;
+    },
+    setMusicVolume: function (v) {
+      musicVol = GU.clamp(v, 0, 1) * 0.5; // music stays under sfx by design
+      if (musicBus) musicBus.gain.value = musicVol;
+    },
+    getSfxVolume: function () { return sfxVol; },
+    getMusicVolume: function () { return musicVol / 0.5; },
 
     // ---- SFX (each is a silent no-op before GA.init) -----------------------
 
@@ -249,6 +264,47 @@
       tone('sine', 392.0, 392.0, t, 0.26, 0.18);
       tone('sine', 311.13, 311.13, t + 0.3, 0.26, 0.18);
       tone('sine', 233.08, 233.08, t + 0.6, 0.3, 0.18);
+    },
+
+    // ---- v2 SFX ---------------------------------------------------------------
+
+    nova: function () { // radial blast: sub drop + wide filtered noise wash
+      if (!ready() || !allowVoice()) return;
+      var t = ctx.currentTime;
+      tone('sine', 160, 30, t, 0.45, 0.32);
+      tone('sawtooth', 320, 50, t, 0.3, 0.14);
+      noise(t, 0.4, 0.22, 'lowpass', 2400, 120);
+    },
+
+    power: function () { // pickup: bright rising 2-tone chirp
+      if (!ready() || !rateOk('power', 60) || !allowVoice()) return;
+      var t = ctx.currentTime;
+      tone('sine', 660, 660, t, 0.07, 0.12);
+      tone('sine', 880, 1320, t + 0.07, 0.12, 0.12);
+    },
+
+    shieldHit: function () { // aegis blocks a hit: glassy ping + small noise
+      if (!ready() || !allowVoice()) return;
+      var t = ctx.currentTime;
+      tone('triangle', 1240, 880, t, 0.12, 0.16);
+      noise(t, 0.06, 0.06, 'highpass', 4000, 0);
+    },
+
+    codex: function () { // archive unlock blip: soft two-note tick
+      if (!ready() || !rateOk('codex', 120) || !allowVoice()) return;
+      var t = ctx.currentTime;
+      tone('sine', 392, 392, t, 0.08, 0.1);
+      tone('sine', 587.33, 587.33, t + 0.09, 0.1, 0.1);
+    },
+
+    dawn: function () { // victory fanfare: major arp, bright and slow
+      if (!ready() || !allowVoice()) return;
+      var t = ctx.currentTime;
+      tone('sine', 523.25, 523.25, t, 0.3, 0.16);
+      tone('sine', 659.25, 659.25, t + 0.16, 0.3, 0.16);
+      tone('sine', 783.99, 783.99, t + 0.32, 0.34, 0.16);
+      tone('sine', 1046.5, 1046.5, t + 0.48, 0.5, 0.14);
+      noise(t + 0.48, 0.7, 0.05, 'highpass', 6000, 0);
     },
 
     // ---- Music --------------------------------------------------------------

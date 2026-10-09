@@ -210,7 +210,35 @@ function main() {
     assert(Game.state === 0, 'state drifted from TITLE without input');
   });
 
-  step('Enter starts a run -> PLAYING', function () {
+  step('TITLE menu: Down+Enter on SETTINGS -> SETTINGS state', function () {
+    assert(Game.titleSel === 0, 'titleSel should start at 0 (START RUN)');
+    GI.pressedThisFrame.add('ArrowDown');
+    pump(1);
+    assert(Game.titleSel === 1, 'menu nav did not move to SETTINGS');
+    GI.pressedThisFrame.add('Enter');
+    pump(1);
+    assert(Game.state === 5, 'expected SETTINGS (5), got ' + Game.state);
+  });
+
+  step('SETTINGS: adjust music slider, toggle, back to TITLE', function () {
+    var m0 = Game.settings.music;
+    GI.pressedThisFrame.add('ArrowRight');
+    pump(1);
+    assert(Game.settings.music === m0 + 1, 'music slider did not move');
+    GI.pressedThisFrame.add('ArrowUp');   // wrap from row 0 to BACK (last row)
+    pump(1);
+    var lastIdx = Game.settingsItems.length - 1;
+    assert(Game.settingsSel === lastIdx, 'wrap nav did not reach BACK row');
+    GI.pressedThisFrame.add('Enter');
+    pump(1);
+    assert(Game.state === 0, 'BACK did not return to TITLE, got ' + Game.state);
+  });
+
+  step('Enter on START RUN -> PLAYING', function () {
+    assert(Game.state === 0 && Game.titleSel === 1,
+      'expected TITLE with selection remembered on SETTINGS');
+    GI.pressedThisFrame.add('ArrowUp');       // 1 -> 0 = START RUN
+    pump(1);
     GI.pressedThisFrame.add('Enter');
     pump(1);
     assert(Game.state === 1, 'expected PLAYING (1), got ' + Game.state);
@@ -309,10 +337,23 @@ function main() {
       'run did not fully reset (score ' + Game.score + ', wave ' + GW.state.wave + ')');
   });
 
-  step('Esc pauses, Q quits to TITLE', function () {
+  step('pause menu: RESUME via Enter, SETTINGS via menu, Q quits', function () {
     GI.pressedThisFrame.add('Escape');
     pump(1);
     assert(Game.state === 3, 'expected PAUSED (3), got ' + Game.state);
+    GI.pressedThisFrame.add('Enter');          // sel 0 = RESUME
+    pump(1);
+    assert(Game.state === 1, 'RESUME did not return to PLAYING');
+    GI.pressedThisFrame.add('Escape');
+    pump(1);
+    GI.pressedThisFrame.add('ArrowDown');      // sel 1 = SETTINGS
+    pump(1);
+    GI.pressedThisFrame.add('Enter');
+    pump(1);
+    assert(Game.state === 5, 'pause SETTINGS item did not open SETTINGS');
+    GI.pressedThisFrame.add('Escape');          // back -> PAUSED
+    pump(1);
+    assert(Game.state === 3, 'settings BACK did not return to PAUSED');
     GI.pressedThisFrame.add('KeyQ');
     pump(1);
     assert(Game.state === 0, 'expected TITLE after quit, got ' + Game.state);

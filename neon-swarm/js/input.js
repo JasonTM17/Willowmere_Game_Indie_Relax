@@ -13,8 +13,11 @@
 
   var keys = new Set();              // currently held e.code values
   var pressedThisFrame = new Set();  // e.code values that went down this frame
-  var mouse = { x: 0, y: 0, down: false };
+  // mouse.down = LMB (fire); mouse.rdown = RMB (nova). Right clicks surface
+  // as the pseudo-code 'MouseRight' in pressedThisFrame for edge detection.
+  var mouse = { x: 0, y: 0, down: false, rdown: false };
   var clickQueued = false;
+  var rmbQueued = false;
   var bound = false;
   var canvas = null;
 
@@ -43,12 +46,19 @@
   }
 
   function onMouseDown(e) {
-    if (e.button !== 0) return; // left button only
+    if (e.button === 2) {          // RMB = the nova trigger (v2)
+      mouse.rdown = true;
+      rmbQueued = true;
+      pressedThisFrame.add('MouseRight');
+      return;
+    }
+    if (e.button !== 0) return;    // LMB
     mouse.down = true;
     clickQueued = true;
   }
 
   function onMouseUp(e) {
+    if (e.button === 2) { mouse.rdown = false; return; }
     if (e.button !== 0) return;
     mouse.down = false;
   }
@@ -58,7 +68,9 @@
     keys.clear();
     pressedThisFrame.clear();
     mouse.down = false;
+    mouse.rdown = false;
     clickQueued = false;
+    rmbQueued = false;
   }
 
   var GI = {
@@ -110,10 +122,18 @@
       return v;
     },
 
+    // True once per RMB down; nova polls this (menus never see it).
+    consumeRmb: function () {
+      var v = rmbQueued;
+      rmbQueued = false;
+      return v;
+    },
+
     // Called by main at the end of every frame; clears per-frame state.
     endFrame: function () {
       pressedThisFrame.clear();
       clickQueued = false;
+      rmbQueued = false;
     }
   };
 
