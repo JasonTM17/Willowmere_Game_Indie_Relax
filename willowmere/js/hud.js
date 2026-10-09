@@ -274,7 +274,7 @@ window.WHUD = (function () {
     panel(ctx, x, y, w, h);
 
     ctx.textAlign = 'center';
-    ctx.font = 'italic 20px Georgia,serif';
+    ctx.font = 'italic 20px "Times New Roman",serif';
     ctx.fillStyle = '#f6ecd2';
     ctx.fillText('Túi đồ', vw / 2, y + 30);
     /* gold flourish under the title */
@@ -543,7 +543,7 @@ window.WHUD = (function () {
     /* logo: letter-spaced serif, cream-to-gold gradient over a soft shadow */
     var spaced = 'WILLOWMERE'.split('').join('\u2009');
     ctx.textAlign = 'center';
-    ctx.font = 'italic 700 56px Georgia,"Times New Roman",serif';
+    ctx.font = 'italic 700 56px "Times New Roman",serif';
     ctx.fillStyle = 'rgba(0,0,0,0.55)';
     ctx.fillText(spaced, vw / 2 + 3, ly + 4);
     var lg = ctx.createLinearGradient(0, ly - 46, 0, ly + 10);
@@ -552,7 +552,7 @@ window.WHUD = (function () {
     lg.addColorStop(1, '#e6c07a');
     ctx.fillStyle = lg;
     ctx.fillText(spaced, vw / 2, ly);
-    ctx.font = 'italic 18px Georgia,serif';
+    ctx.font = 'italic 18px "Times New Roman",serif';
     ctx.fillStyle = 'rgba(246,236,210,0.9)';
     ctx.fillText('một ánh sáng nhỏ, giữ cùng nhau', vw / 2, ly + 34);
 
@@ -607,7 +607,7 @@ window.WHUD = (function () {
     var x = vw / 2 - w / 2, y = vh / 2 - h / 2;
     panel(ctx, x, y, w, h);
     ctx.textAlign = 'center';
-    ctx.font = 'italic 26px Georgia,serif';
+    ctx.font = 'italic 26px "Times New Roman",serif';
     ctx.fillStyle = '#f6ecd2';
     ctx.fillText('Tạm dừng', vw / 2, y + 44);
     ctx.strokeStyle = 'rgba(240,200,130,0.5)';
@@ -646,7 +646,7 @@ window.WHUD = (function () {
     var x = vw / 2 - w / 2, y = vh / 2 - h / 2;
     panel(ctx, x, y, w, h);
     ctx.textAlign = 'center';
-    ctx.font = 'italic 24px Georgia,serif';
+    ctx.font = 'italic 24px "Times New Roman",serif';
     ctx.fillStyle = '#f6ecd2';
     ctx.fillText('Cài đặt', vw / 2, y + 42);
 
@@ -710,7 +710,7 @@ window.WHUD = (function () {
       ctx.fillStyle = '#ffd98a';
       var name = VISTA_NAMES[vista.id] || 'Willowmere';
       ctx.fillText(name.toUpperCase().split('').join('\u2009'), vw / 2, vh * 0.72);
-      ctx.font = 'italic 17px Georgia,serif';
+      ctx.font = 'italic 17px "Times New Roman",serif';
       ctx.fillStyle = '#f2ead8';
       /* wrap caption into two lines if long */
       var words = String(vista.caption).split(' ');
@@ -747,7 +747,7 @@ window.WHUD = (function () {
       epiCache.total = 0;
       for (var m = 0; m < paragraphs.length; m++) {
         var pm = paragraphs[m];
-        ctx.font = pm.big ? 'italic 700 34px Georgia,serif' : 'italic 16px Georgia,serif';
+        ctx.font = pm.big ? 'italic 700 34px "Times New Roman",serif' : 'italic 16px "Times New Roman",serif';
         var lm = wrapPara(ctx, pm.text, vw * 0.66);
         var hm = pm.big ? 60 : lm.length * 26 + 18;
         epiCache.items.push({ p: pm, lines: lm, h: hm, font: ctx.font });

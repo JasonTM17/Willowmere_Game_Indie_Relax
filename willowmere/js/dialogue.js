@@ -584,7 +584,7 @@ window.WDialogue = (function () {
       ctx.textAlign = 'left';
       ctx.fillText(spkName, nx + 18, y + 5);
     } else {
-      ctx.font = 'italic 12px Georgia,serif';
+      ctx.font = 'italic 12px "Times New Roman",serif';
       ctx.fillStyle = 'rgba(242,234,216,0.55)';
       ctx.textAlign = 'left';
       ctx.fillText('\u00b7 \u00b7 \u00b7', x + 18, y + 6);
@@ -595,7 +595,7 @@ window.WDialogue = (function () {
     }
 
     /* typed text (measured once per node, revealed per frame) */
-    ctx.font = isNarr ? 'italic 15px Georgia,serif' : '15px "Segoe UI",Verdana,sans-serif';
+    ctx.font = isNarr ? 'italic 15px "Times New Roman",serif' : '15px "Segoe UI",Verdana,sans-serif';
     ctx.fillStyle = '#f2ead8';
     ctx.textAlign = 'left';
     var tx = portrait ? x + 104 : x + 20;
