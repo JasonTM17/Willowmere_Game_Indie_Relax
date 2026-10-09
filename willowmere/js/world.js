@@ -231,23 +231,23 @@ window.WWorld = (function () {
   ];
 
   var SIGN_DEFS = [
-    { tx: 30, ty: 45, text: 'North: Willow Forest. Mind the willows; they mind you back.' },
-    { tx: 45, ty: 47, text: 'East: Lake Willowmere. The pier is good for thinking.' },
-    { tx: 24, ty: 59, text: 'South: The Beach. Tide pools are best at dawn.' },
-    { tx: 94, ty: 59, text: 'East: High Hills. The Tor watches back.' },
-    { tx: 79, ty: 83, text: 'The Headland: the old lamp. Two years dark.' }
+    { tx: 30, ty: 45, text: 'Phía bắc: Rừng Liễu. Coi chừng liễu rủ; chúng cũng đang coi chừng bạn.' },
+    { tx: 45, ty: 47, text: 'Phía đông: Hồ Willowmere. Cầu tàu rất hợp để trầm tư.' },
+    { tx: 24, ty: 59, text: 'Phía nam: Bãi Biển. Vũng triều đẹp nhất lúc bình minh.' },
+    { tx: 94, ty: 59, text: 'Phía đông: Đồi Cao. Đỉnh Tor đang nhìn lại bạn.' },
+    { tx: 79, ty: 83, text: 'Mũi Đất: ngọn đèn cũ. Tắt đã hai năm.' }
   ];
 
   var VISTA_DEFS = [
-    { id: 'willow_overlook', tx: 30, ty: 8, caption: 'From here, every chimney in Willowmere smokes like a friendly word.' },
+    { id: 'willow_overlook', tx: 30, ty: 8, caption: 'Từ đây, mỗi ống khói của Willowmere đều thở ra một lời thân thiện.' },
     /* DESIGN places heron_rock at (102,28), which falls inside the lake
        ellipse; nudged to the walkable north shore 2 tiles up. */
-    { id: 'heron_rock', tx: 102, ty: 26, caption: 'The lake keeps yesterday\u2019s sky on the bottom.' },
+    { id: 'heron_rock', tx: 102, ty: 26, caption: 'Hồ giữ bầu trời của ngày hôm qua ở tận đáy.' },
     /* DESIGN places lighthouse_head at (69,88), which is open sea; nudged to
        the headland lip. */
-    { id: 'lighthouse_head', tx: 69, ty: 86, caption: 'Two years dark. The gulls still circle it, out of habit.' },
-    { id: 'shepherds_tor', tx: 112, ty: 60, caption: 'The whole valley, and not one hurried thing in it.' },
-    { id: 'old_stone_circle', tx: 14, ty: 18, caption: 'Older than the lamp. It doesn\u2019t mind waiting.' }
+    { id: 'lighthouse_head', tx: 69, ty: 86, caption: 'Hai năm tắt ngấm. Mấy con hải âu vẫn vòng quanh, theo thói quen.' },
+    { id: 'shepherds_tor', tx: 112, ty: 60, caption: 'Cả thung lũng hiện ra, và không một thứ gì vội vã trong đó.' },
+    { id: 'old_stone_circle', tx: 14, ty: 18, caption: 'Cổ hơn cả ngọn đèn. Nó chẳng ngại chờ đợi.' }
   ];
 
   /* ---- interactable onUse implementations (engine-stage behaviour) ---- */
@@ -274,8 +274,8 @@ window.WWorld = (function () {
       window.WGame.sleep();
       return;
     }
-    if (!night) toast('Too bright to sleep yet \u2014 come back after 18:00.');
-    else toast('The bed is turned down and waiting.');
+    if (!night) toast('Trời còn sáng lắm \u2014 quay lại sau 18:00 nhé.');
+    else toast('Chiếc giường đã trải sẵn, chờ bạn.');
     blip('click');
   }
 
@@ -286,18 +286,18 @@ window.WWorld = (function () {
         window.WDialogue.start('climb_menu'); // story registers the node at boot
         return;
       }
-      toast('The lamp room waits above.');
+      toast('Phòng đèn đang chờ phía trên.');
       blip('bell');
       return;
     }
-    toast('The tower door is shut. It isn\u2019t locked \u2014 it\u2019s waiting.');
+    toast('Cửa tháp khép kín. Không khóa đâu \u2014 nó đang chờ.');
     blip('click');
   }
 
   function shedUse() {
     var S = window.WStory;
     if (S && typeof S.readLetter === 'function') { S.readLetter(envNow()); return; }
-    toast('A small lock. Inside, a letter rustles \u2014 kept for years, for someone.');
+      toast('Một ổ khóa nhỏ. Bên trong, lá thư xào xạc \u2014 được giữ nhiều năm, cho một ai đó.');
     blip('click');
   }
 
@@ -307,16 +307,16 @@ window.WWorld = (function () {
     var e = envNow();
     var day = e && e.day ? e.day : 1;
     if (this._usedDay === day) {
-      toast('The bees are still making more. Come back tomorrow.');
+      toast('Ong vẫn đang làm thêm. Mai quay lại nhé.');
       return;
     }
     if (A && typeof A.add === 'function') {
       A.add('food_honeycomb', 1);
       this._usedDay = day;
-      toast('You gather a piece of honeycomb. The bees hum approval.');
+      toast('Bạn lấy được một miếng tổ ong. Đàn ong vo ve tán thành.');
       blip('pop');
     } else {
-      toast('The hive hums, heavy with honey.');
+      toast('Tổ ong ù ù, nặng trĩu mật.');
       blip('click');
     }
   }
@@ -329,10 +329,10 @@ window.WWorld = (function () {
       A.add('seeds_pouch', 1);
       this._taken = true;
       if (S && typeof S.setFlag === 'function') S.setFlag('seed_pouch_found', true);
-      toast('A seed pouch, dropped on the hill trail. Gideon will want this back.');
+      toast('Một túi hạt giống rơi trên đường đồi. Gideon sẽ muốn nó lại lắm.');
       blip('pop');
     } else {
-      toast('Something glints on the trail \u2014 a small canvas pouch of seeds.');
+      toast('Có gì đó lấp lánh trên đường mòn \u2014 một túi vải nhỏ đựng hạt giống.');
       blip('click');
     }
   }
@@ -358,18 +358,18 @@ window.WWorld = (function () {
       shown++;
     }
     if (!shown) {
-      toast('"TIDE TABLES \u00b7 LOST & FOUND \u00b7 FESTIVAL COMMITTEE \u2014 postponed, two years running."');
+      toast('"BẢNG THỦY TRIỀU \u00b7 CỦA RƠI CỦA LẠC \u00b7 BAN LỄ HỘI \u2014 hoãn, năm thứ hai liên tiếp."');
     }
     blip('click');
   }
 
   function stoneCircleUse() {
-    toast('The stones are cool and older than the lamp.');
+    toast('Mấy tảng đá mát lạnh và cổ hơn cả ngọn đèn.');
     blip('bell');
   }
 
   function pierEndUse() {
-    toast('Gulls argue about nothing. The lake keeps yesterday\u2019s sky.');
+    toast('Hải âu cãi nhau chuyện không đâu. Hồ vẫn giữ bầu trời của hôm qua.');
     blip('splash');
   }
 
@@ -379,7 +379,7 @@ window.WWorld = (function () {
   function arcadeUse(game) {
     if (game && typeof game.openArcade === 'function') game.openArcade();
     else if (window.WGame && typeof WGame.openArcade === 'function') WGame.openArcade();
-    else toast('The cabinet flickers, then thinks better of it.');
+    else toast('Chiếc tủ chớp nhẹ rồi thôi ý định.');
   }
 
   function makeInteractable(id, tx, ty, label, onUse, requires) {
@@ -685,34 +685,34 @@ window.WWorld = (function () {
     }
 
     /* 13. interactables (§5.4) */
-    interactables.push(makeInteractable('door_player', 29, 57, 'Sleep', doorPlayerUse));
+    interactables.push(makeInteractable('door_player', 29, 57, 'Ngủ', doorPlayerUse));
     interactables.push(makeInteractable(
-      'door_lighthouse', 69, 85, 'Climb the tower', doorLighthouseUse,
+      'door_lighthouse', 69, 85, 'Leo tháp', doorLighthouseUse,
       { flags: ['marlow_confession'], hour: [20, 24] }));
     interactables.push(makeInteractable(
-      'rosa_shed', 49, 54, 'Read the letter', shedUse,
+      'rosa_shed', 49, 54, 'Đọc lá thư', shedUse,
       { anyFlags: ['show_won', 'show_patience'] }));
     for (hv = 0; hv < hiveTiles.length; hv++) {
       interactables.push(makeInteractable(
         'hive_' + (hv + 1), hiveTiles[hv][0], hiveTiles[hv][1],
-        'Gather honeycomb', hiveUse));
+        'Lấy tổ ong', hiveUse));
     }
     interactables.push(makeInteractable(
-      'seed_glint', 98, 60, 'Pick up the seed pouch', seedGlintUse,
+      'seed_glint', 98, 60, 'Nhặt túi hạt giống', seedGlintUse,
       { notFlags: ['seeds_returned', 'seeds_gifted'] }));
-    interactables.push(makeInteractable('notice_board', 37, 49, 'Read the notice board', noticeBoardUse));
+    interactables.push(makeInteractable('notice_board', 37, 49, 'Đọc bảng tin', noticeBoardUse));
     for (s = 0; s < SIGN_DEFS.length; s++) {
       (function (sd, n) {
-        interactables.push(makeInteractable('sign_' + (n + 1), sd.tx, sd.ty, 'Read the sign', function () {
+        interactables.push(makeInteractable('sign_' + (n + 1), sd.tx, sd.ty, 'Đọc biển chỉ', function () {
           toast(sd.text);
           blip('click');
         }));
       })(SIGN_DEFS[s], s);
       addBC('sign', SIGN_DEFS[s].tx, SIGN_DEFS[s].ty, 1, 1, 'props', true);
     }
-    interactables.push(makeInteractable('stone_circle', 14, 18, 'Touch the old stone', stoneCircleUse));
-    interactables.push(makeInteractable('pier_end', 75, 44, 'Watch the lake', pierEndUse));
-    interactables.push(makeInteractable('arcade_cabinet', 31, 57, 'Play the old cabinet', arcadeUse));
+    interactables.push(makeInteractable('stone_circle', 14, 18, 'Chạm vào đá cổ', stoneCircleUse));
+    interactables.push(makeInteractable('pier_end', 75, 44, 'Ngắm hồ', pierEndUse));
+    interactables.push(makeInteractable('arcade_cabinet', 31, 57, 'Chơi chiếc tủ cũ', arcadeUse));
     solid[idx(31, 57)] = 1;                       // the cabinet blocks its tile
 
     /* 14. torches (night glow sources) */

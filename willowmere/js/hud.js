@@ -27,11 +27,11 @@ window.WHUD = (function () {
   var lastWeather = null;
 
   var VISTA_NAMES = {
-    willow_overlook: 'Willow Overlook',
-    heron_rock: 'Heron Rock',
-    lighthouse_head: 'Lighthouse Head',
-    shepherds_tor: 'Shepherd\u2019s Tor',
-    old_stone_circle: 'Old Stone Circle'
+    willow_overlook: 'Đồi Liễu',
+    heron_rock: 'Đá Diệc',
+    lighthouse_head: 'Mũi Hải Đăng',
+    shepherds_tor: 'Đỉnh Chăn Cừu',
+    old_stone_circle: 'Vòng Đá Cổ'
   };
 
   /* ui.png atlas rows (160×112 sheet): hearts/tools/weather row 4,
@@ -175,44 +175,44 @@ window.WHUD = (function () {
     if (!S || !A) return '';
     if (q.state === 'available') {
       var nm = firstNpcName(q.npc);
-      return nm ? 'Talk to ' + nm + '.' : 'Find a friend in the village.';
+      return nm ? 'Nói chuyện với ' + nm + '.' : 'Tìm một người bạn trong làng.';
     }
     switch (q.id) {
       case 'the_dark_lamp': {
         var e = S.embers();
         var ready = e >= 4 && S.flag('marlow_confession');
-        if (ready) return 'Climb the lighthouse tonight (after 20:00).';
-        return 'Ember Lights ' + e + '/4' +
-          (S.flag('marlow_confession') ? '' : ' \u00b7 hear Marlow out');
+        if (ready) return 'Leo hải đăng tối nay (sau 20:00).';
+        return 'Ánh Than Hồng ' + e + '/4' +
+          (S.flag('marlow_confession') ? '' : ' \u00b7 nghe Marlow tâm sự');
       }
       case 'honey_loaf':
         return A.count('food_honeycomb') > 0
-          ? 'Bring the honeycomb to Mira.'
-          : 'Gather honeycomb at the north hives.';
+          ? 'Mang miếng tổ ong cho Mira.'
+          : 'Hái tổ ong ở bầy ong phía bắc.';
       case 'seeds_of_spring':
         return S.flag('seed_pouch_found')
-          ? 'Return the seed pouch to Gideon.'
-          : 'Search the east hill trail for the pouch.';
+          ? 'Trả túi hạt giống cho Gideon.'
+          : 'Tìm túi hạt trên đường đồi phía đông.';
       case 'garden_show':
         return A.count('moonbell') > 0
-          ? 'Bring the moonbell to Rosa.'
-          : 'Find a moonbell in the night forest (21:00+).';
+          ? 'Mang hoa chuông trăng cho Rosa.'
+          : 'Tìm hoa chuông trăng trong rừng đêm (21:00+).';
       case 'big_one':
         return S.flag('siltjaw_caught')
-          ? 'Show Finn the catch.'
-          : 'Fish the lake for Siltjaw (press F).';
+          ? 'Khoe chiến lợi với Finn.'
+          : 'Câu Siltjaw ở hồ (nhấn F).';
       case 'parcel':
-        return 'Decide the parcel\u2019s fate with Hana.';
+        return 'Quyết định số phận bưu kiện cùng Hana.';
       case 'lost_lamb':
-        return 'Find the lamb in the forest after dark (20:00+).';
+        return 'Tìm cừu con trong rừng tối (20:00+).';
       case 'colors': {
         var seen = vistaSeenCount();
         return seen >= 4
-          ? 'Bring Junie a firefly in a jar.'
-          : 'Visit the vistas (' + seen + '/4).';
+          ? 'Mang cho Junie một hũ đom đóm.'
+          : 'Ghé các điểm ngắm cảnh (' + seen + '/4).';
       }
       case 'keeper_regret':
-        return 'Meet Marlow at the lighthouse base, 18:00\u201321:00.';
+        return 'Gặp Marlow ở chân hải đăng, 18:00\u201321:00.';
     }
     return String(q.hint || '');
   }
@@ -235,11 +235,11 @@ window.WHUD = (function () {
       if (prev === q.state) continue;
       qSnap[k2] = q.state;
       if (q.state === 'available' && prev === 'locked') {
-        toast('New task: ' + q.title);
+        toast('Nhiệm vụ mới: ' + q.title);
       } else if (q.state === 'active') {
-        toast('Task accepted: ' + q.title);
+        toast('Đã nhận: ' + q.title);
       } else if (q.state === 'done_a' || q.state === 'done_b') {
-        toast('Task complete: ' + q.title);
+        toast('Hoàn thành: ' + q.title);
       }
     }
   }
@@ -254,8 +254,8 @@ window.WHUD = (function () {
     var w = env && env.weather ? env.weather : 'clear';
     if (lastWeather === null) { lastWeather = w; return; }
     if (w !== lastWeather) {
-      if (w === 'rain') toast('Rain sweeps in from the sea.');
-      else toast('The rain moves on.');
+      if (w === 'rain') toast('Mưa từ biển tràn vào.');
+      else toast('Mưa đã tạnh.');
       lastWeather = w;
     }
   }
@@ -276,7 +276,7 @@ window.WHUD = (function () {
     ctx.textAlign = 'center';
     ctx.font = 'italic 20px Georgia,serif';
     ctx.fillStyle = '#f6ecd2';
-    ctx.fillText('Pouch', vw / 2, y + 30);
+    ctx.fillText('Túi đồ', vw / 2, y + 30);
     /* gold flourish under the title */
     ctx.strokeStyle = 'rgba(240,200,130,0.5)';
     ctx.lineWidth = 1;
@@ -297,7 +297,7 @@ window.WHUD = (function () {
     ctx.restore();
     ctx.font = font(11);
     ctx.fillStyle = cream(0.6);
-    ctx.fillText(keys.length + ' of ' + (BAG_COLS * BAG_ROWS) + ' slots', vw / 2, y + 54);
+    ctx.fillText(keys.length + '/' + (BAG_COLS * BAG_ROWS) + ' ô', vw / 2, y + 54);
 
     ctx.textAlign = 'left';
     for (var r = 0; r < BAG_ROWS; r++) {
@@ -356,7 +356,7 @@ window.WHUD = (function () {
     ctx.textAlign = 'center';
     ctx.font = font(11, false, true);
     ctx.fillStyle = cream(0.55);
-    ctx.fillText('Tab \u2014 close', vw / 2, y + h - 16);
+    ctx.fillText('Tab \u2014 đóng', vw / 2, y + h - 16);
   }
 
   /* ---- in-world HUD ---- */
@@ -378,7 +378,7 @@ window.WHUD = (function () {
 
     /* clock chip — warm pill, gold hour, vector weather glyph */
     var time = WU.fmtHour(h);
-    var dayTxt = 'Day ' + (env && env.day ? env.day : 1);
+    var dayTxt = 'Ngày ' + (env && env.day ? env.day : 1);
     ctx.font = font(13, true);
     var hourTxt = time;
     var cw = ctx.measureText(dayTxt).width + ctx.measureText(hourTxt).width + 58;
@@ -400,12 +400,12 @@ window.WHUD = (function () {
     /* rain forecast chip: rain is rolled at 06:00 for the whole day */
     if (weather !== 'rain' && rainTomorrow(env)) {
       ctx.font = font(11, true);
-      var fw = ctx.measureText('Rain tomorrow').width + 40;
+      var fw = ctx.measureText('Ngày mai có mưa').width + 40;
       var fx = Math.round(vw / 2 - fw / 2);
       panel(ctx, fx, 48, fw, 22, { radius: 11, alpha: 0.85 });
       WU.weatherGlyph(ctx, 'rain', fx + 9, 52, 11);
       ctx.fillStyle = '#c8dcea';
-      ctx.fillText('Rain tomorrow', fx + 26, 63);
+      ctx.fillText('Ngày mai có mưa', fx + 26, 63);
     }
 
     /* quest panel: active quests (with current step), then available */
@@ -461,7 +461,7 @@ window.WHUD = (function () {
     }
 
     /* tool chips — keycap + label, sized to content */
-    var chips = [['Q', 'Net'], ['F', 'Rod'], ['\u25ce', 'Sling'], ['Tab', 'Bag']];
+    var chips = [['Q', 'Lưới'], ['F', 'Cần'], ['\u25ce', 'Nỏ'], ['Tab', 'Túi']];
     var chx = vw - 12;
     ctx.textAlign = 'left';
     for (i = chips.length - 1; i >= 0; i--) {
@@ -554,7 +554,7 @@ window.WHUD = (function () {
     ctx.fillText(spaced, vw / 2, ly);
     ctx.font = 'italic 18px Georgia,serif';
     ctx.fillStyle = 'rgba(246,236,210,0.9)';
-    ctx.fillText('a small light, kept together', vw / 2, ly + 34);
+    ctx.fillText('một ánh sáng nhỏ, giữ cùng nhau', vw / 2, ly + 34);
 
     /* gold flourish: line — diamond — line */
     var fy = ly + 58, half = 120;
@@ -575,9 +575,9 @@ window.WHUD = (function () {
 
     /* menu */
     var items = [
-      { id: 'new', label: 'New Game' },
-      { id: 'continue', label: hasSave ? 'Continue' : 'Continue (no save)', dim: !hasSave },
-      { id: 'settings', label: 'Settings' }
+      { id: 'new', label: 'Chơi mới' },
+      { id: 'continue', label: hasSave ? 'Tiếp tục' : 'Tiếp tục (chưa có lưu)', dim: !hasSave },
+      { id: 'settings', label: 'Cài đặt' }
     ];
     var bw = 264, bh = 46;
     var by = vh * 0.55;
@@ -587,7 +587,7 @@ window.WHUD = (function () {
     }
 
     /* controls hint in a quiet pill */
-    var hint = 'WASD move \u00b7 E interact \u00b7 Q net \u00b7 F rod \u00b7 click sling \u00b7 Tab pouch \u00b7 Esc pause';
+    var hint = 'WASD di chuyển \u00b7 E tương tác \u00b7 Q lưới \u00b7 F câu \u00b7 click nỏ \u00b7 Tab túi \u00b7 Esc tạm dừng';
     ctx.font = font(12);
     var hw = ctx.measureText(hint).width + 36;
     panel(ctx, vw / 2 - hw / 2, vh - 40, hw, 26, { radius: 13, alpha: 0.7 });
@@ -609,7 +609,7 @@ window.WHUD = (function () {
     ctx.textAlign = 'center';
     ctx.font = 'italic 26px Georgia,serif';
     ctx.fillStyle = '#f6ecd2';
-    ctx.fillText('Paused', vw / 2, y + 44);
+    ctx.fillText('Tạm dừng', vw / 2, y + 44);
     ctx.strokeStyle = 'rgba(240,200,130,0.5)';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -622,17 +622,17 @@ window.WHUD = (function () {
     ctx.fillRect(-3, -3, 6, 6);
     ctx.restore();
     var items = [
-      { id: 'resume', label: 'Resume' },
-      { id: 'save', label: 'Save' },
-      { id: 'settings', label: 'Settings' },
-      { id: 'quit', label: 'Quit to Title' }
+      { id: 'resume', label: 'Tiếp tục' },
+      { id: 'save', label: 'Lưu' },
+      { id: 'settings', label: 'Cài đặt' },
+      { id: 'quit', label: 'Về màn hình chính' }
     ];
     for (var i = 0; i < items.length; i++) {
       button(ctx, items[i].label, x + 40, y + 70 + i * 50, w - 80, 40, i === sel, false, items[i].id);
     }
     ctx.font = font(11, false, true);
     ctx.fillStyle = 'rgba(242,234,216,0.55)';
-    ctx.fillText('Progress saves when you sleep, too.', vw / 2, y + h - 14);
+    ctx.fillText('Tiến trình cũng được lưu khi bạn ngủ.', vw / 2, y + h - 14);
   }
 
   /* ---- Settings ---- */
@@ -648,12 +648,12 @@ window.WHUD = (function () {
     ctx.textAlign = 'center';
     ctx.font = 'italic 24px Georgia,serif';
     ctx.fillStyle = '#f6ecd2';
-    ctx.fillText('Settings', vw / 2, y + 42);
+    ctx.fillText('Cài đặt', vw / 2, y + 42);
 
     var rows = [
-      { id: 'music', label: 'Music', v: musicVol },
-      { id: 'sfx', label: 'SFX', v: sfxVol },
-      { id: 'mute', label: muteOn ? 'Sound: Muted' : 'Sound: On' }
+      { id: 'music', label: 'Nhạc', v: musicVol },
+      { id: 'sfx', label: 'Hiệu ứng', v: sfxVol },
+      { id: 'mute', label: muteOn ? 'Âm thanh: Tắt' : 'Âm thanh: Bật' }
     ];
     for (var i = 0; i < rows.length; i++) {
       var ry = y + 76 + i * 50;
@@ -678,7 +678,7 @@ window.WHUD = (function () {
       } else {
         ctx.font = font(13);
         ctx.fillStyle = muteOn ? 'rgba(220,190,180,0.85)' : 'rgba(242,234,216,0.7)';
-        ctx.fillText(muteOn ? 'everything silenced' : 'playing', x + 130, ry);
+        ctx.fillText(muteOn ? 'đã tắt tiếng' : 'đang phát', x + 130, ry);
       }
       if (sel === i) {
         ctx.fillStyle = '#ffd98a';
@@ -687,10 +687,10 @@ window.WHUD = (function () {
       }
     }
     ctx.textAlign = 'center';
-    button(ctx, 'Back', vw / 2 - 70, y + h - 56, 140, 38, sel === 3, false, 'back');
+    button(ctx, 'Quay lại', vw / 2 - 70, y + h - 56, 140, 38, sel === 3, false, 'back');
     ctx.font = font(11);
     ctx.fillStyle = 'rgba(242,234,216,0.5)';
-    ctx.fillText('\u2190 \u2192 adjust \u00b7 E select \u00b7 Esc back', vw / 2, y + h - 12);
+    ctx.fillText('\u2190 \u2192 chỉnh \u00b7 E chọn \u00b7 Esc quay lại', vw / 2, y + h - 12);
   }
 
   /* ---- Vista ---- */
@@ -778,7 +778,7 @@ window.WHUD = (function () {
       var pulse = scrollT >= 1 ? 0.6 + 0.4 * Math.sin(performance.now() * 0.004) : 0.35;
       ctx.font = font(14, true);
       ctx.fillStyle = 'rgba(255,214,130,' + pulse.toFixed(3) + ')';
-      ctx.fillText('\u2014 Press E to keep wandering \u2014', vw / 2, y + 36);
+      ctx.fillText('\u2014 Nhấn E để tiếp tục dạo chơi \u2014', vw / 2, y + 36);
     }
   }
 

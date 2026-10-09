@@ -182,7 +182,7 @@ window.WDialogue = (function () {
       var hasGift = false;
       for (var j = 0; j < out.length; j++) if (out[j].gift) { hasGift = true; break; }
       if (!hasGift && WAction.list().length > 0) {
-        out.push({ label: '(Give a gift\u2026)', gift: true, _gift: true });
+        out.push({ label: '(Tặng một món quà\u2026)', gift: true, _gift: true });
       }
     }
     return out;
@@ -247,7 +247,7 @@ window.WDialogue = (function () {
     if (!window.WAction || !npcCtx) { close(); return; }
     giftItems = WAction.list();
     if (!giftItems.length) {
-      lastGift = { speaker: npcCtx.def.name, text: 'Your pockets are empty, Warden. Nothing to give \u2014 yet.' };
+      lastGift = { speaker: npcCtx.def.name, text: 'Túi bạn trống rồi, Quản lý. Chưa có gì để cho \u2014 chưa thôi.' };
       start('gift_result');
       return;
     }
@@ -270,7 +270,7 @@ window.WDialogue = (function () {
     if (window.WStory && typeof WStory.onGive === 'function') {
       WStory.onGive(npcCtx.id, key, res && res.tier);
     }
-    lastGift = { speaker: npcCtx.def.name, text: res ? res.line : 'Thank you, Warden.' };
+    lastGift = { speaker: npcCtx.def.name, text: res ? res.line : 'Cảm ơn, Quản lý.' };
     giftMode = false;
     start('gift_result');
   }
@@ -612,7 +612,7 @@ window.WDialogue = (function () {
       var gy = y + 52 + Math.min(3, lines.length) * 21;
       ctx.font = '12px "Segoe UI",Verdana,sans-serif';
       ctx.fillStyle = 'rgba(242,234,216,0.6)';
-      ctx.fillText('Give a gift \u2014 click one, or \u2191\u2193 + E:', tx, gy);
+      ctx.fillText('Tặng quà \u2014 chọn một, hoặc \u2191\u2193 + E:', tx, gy);
       var n = Math.min(3, giftItems.length);
       for (i = 0; i < n; i++) {
         var idx = (giftSel + i) % giftItems.length;
@@ -713,123 +713,123 @@ window.WDialogue = (function () {
      ================================================================ */
   register({
     gift_result: {
-      speaker: function () { return lastGift ? lastGift.speaker : 'You'; },
+      speaker: function () { return lastGift ? lastGift.speaker : 'Bạn'; },
       text: function () { return lastGift ? lastGift.text : '\u2026'; },
       next: null
     },
     sleep_offer: {
       speaker: 'narrator',
-      text: 'The bed is turned down and waiting. Sleep until morning?',
+      text: 'Chiếc giường đã dọn gối sẵn sàng. Ngủ đến sáng?',
       choices: [
-        { label: 'Sleep until morning.', sleep: true },
-        { label: 'Not yet.', next: null }
+        { label: 'Ngủ đến sáng.', sleep: true },
+        { label: 'Chưa đâu.', next: null }
       ]
     },
     intro_1: {
       speaker: 'narrator',
-      text: 'The bus leaves you where the road ends. A sign reads: WILLOWMERE.',
+      text: 'Chuyến xe buýt thả bạn xuống nơi con đường kết thúc. Một tấm biển viết: WILLOWMERE.',
       next: 'intro_2'
     },
     intro_2: {
       speaker: 'narrator',
-      text: 'Two years ago the lighthouse went dark. Old keeper Marlow walked into the hills, guilt in tow.',
+      text: 'Hai năm trước ngọn hải đăng tắt. Người giữ đèn già Marlow bước vào đồi núi, theo sau là nỗi tội.',
       next: 'intro_3'
     },
     intro_3: {
       speaker: 'narrator',
-      text: 'The village hands you Marlow\u2019s cottage, an overgrown garden, and a list of small kindnesses.',
+      text: 'Ngôi làng trao cho bạn căn nhà của Marlow, một vườn mọc um tùm, và một danh sách những điều tử tế nhỏ.',
       next: 'intro_4'
     },
     intro_4: {
       speaker: 'hana',
       setFlag: 'met_hana',
-      text: 'Cottage key. No charge, no refunds. Welcome to inventory, Warden.',
+      text: 'Chìa khóa nhà. Không tính phí, không hoàn tiền. Chào mừng vào danh sách hàng tồn, Quản lý.',
       next: 'intro_5'
     },
     intro_5: {
       speaker: 'narrator',
       setFlag: 'key_given',
-      text: 'Tend the light by tending the people. The lamp will tell you when it\u2019s time.',
+      text: 'Chăm sóc ánh sáng bằng cách chăm sóc con người. Ngọn đèn sẽ nói cho bạn biết khi nào đến lúc.',
       next: null
     },
-    vista_willow_overlook: { speaker: 'narrator', text: 'The willows lean together like old friends sharing a secret.' },
-    vista_heron_rock: { speaker: 'narrator', text: 'A heron watches you watch it. Neither of you moves first.' },
-    vista_lighthouse_head: { speaker: 'narrator', text: 'The lamp room is dark, but the stair is sound. Someday soon.' },
-    vista_shepherds_tor: { speaker: 'narrator', text: 'The wind up here smells of grass and patience.' },
-    vista_old_stone_circle: { speaker: 'narrator', text: 'The stones have counted longer nights than yours.' }
+    vista_willow_overlook: { speaker: 'narrator', text: 'Những hàng liễu nghiêng vào nhau như bạn già chia sẻ bí mật.' },
+    vista_heron_rock: { speaker: 'narrator', text: 'Một con diệc nhìn bạn nhìn nó. Không ai nhúc nhích trước.' },
+    vista_lighthouse_head: { speaker: 'narrator', text: 'Phòng đèn tối đen, nhưng cầu thang còn chắc. Sớm thôi.' },
+    vista_shepherds_tor: { speaker: 'narrator', text: 'Gió trên này có mùi cỏ và sự kiên nhẫn.' },
+    vista_old_stone_circle: { speaker: 'narrator', text: 'Những viên đá đã đếm nhiều đêm dài hơn của bạn.' }
   });
 
   /* greetings per NPC per daypart + friendship unlocks + night idles */
   (function () {
     var G = {
       mira: {
-        am: 'Fresh loaves at dawn \u2014 you smell that? That\u2019s the good part.',
-        day: 'You look a little under-proofed, dear. Sit. Eat something.',
-        pm: 'Evening warmth is for dock strolls. Walk with your thoughts.',
-        idle: 'Ovens are cold, dear. Even butter sleeps.'
+        am: 'Bánh nóng lúc bình minh \u2014 em ngửi thấy không? Đó là phần ngon nhất.',
+        day: 'Trông em hơi non bột đấy, em à. Ngồi xuống. Ăn gì đi.',
+        pm: 'Buổi tối ấm là để dạo bến. Đi bộ cùng suy nghĩ của mình nhé.',
+        idle: 'Lò nguội rồi, em à. Đến bơ cũng đi ngủ.'
       },
       gideon: {
-        am: 'Mind the thyme. It minds you.',
-        day: 'Bees are fair employers. Long hours, honest pay.',
-        pm: 'The greenhouse stays warm even now. Plants keep their own hours.',
-        idle: 'Plants are dreaming. Best not to interrupt.'
+        am: 'Coi chừng cỏ xạ hương. Nó cũng đang coi chừng em.',
+        day: 'Ong là chủ lao động công bằng. Giờ dài, trả lương thật.',
+        pm: 'Nhà kính vẫn ấm đến giờ. Cây cối giữ giờ riêng của chúng.',
+        idle: 'Cây đang mơ. Tốt nhất đừng làm phiền.'
       },
       rosa: {
-        am: 'When I was young, we watered by moonlight. No reason. Tradition.',
-        day: 'The ducks and I have an arrangement. I bring bread.',
-        pm: 'When I was young\u2026 oh, never mind. Lovely evening, isn\u2019t it?',
-        idle: 'When I was young I stayed up late. Now the moon does it for me.'
+        am: 'Hồi trẻ, chúng tôi tưới cây dưới ánh trăng. Không lý do. Truyền thống.',
+        day: 'Đám vịt và tôi có thỏa thuận. Tôi mang bánh mì.',
+        pm: 'Hồi trẻ\u2026 ôi thôi quên đi. Buổi tối đẹp nhỉ?',
+        idle: 'Hồi trẻ tôi thức khuya. Giờ mặt trăng thức thay tôi.'
       },
       marlow: {
-        am: 'Kettle\u2019s on. Tide\u2019s out. Tide\u2019s honest \u2014 I try to be both.',
-        day: 'A keeper keeps. I didn\u2019t. Some days that sentence weighs more.',
-        pm: 'The tower and I have an understanding. We wait.',
-        idle: 'Can\u2019t sleep either? The tower keeps us both.'
+        am: 'Ấm nước sôi. Triều rút. Triều thì trung thực \u2014 ta cố là cả hai.',
+        day: 'Người giữ đèn thì phải giữ. Ta đã không. Có hôm câu đó nặng hơn thường ngày.',
+        pm: 'Ngọn tháp và ta có một thỏa thuận. Chúng ta chờ.',
+        idle: 'Cũng không ngủ được à? Ngọn tháp giữ cả hai chúng ta.'
       },
       finn: {
-        am: 'Morning! Best. Fishing. Hour. The perch aren\u2019t even awake to argue!',
-        day: 'Did you see the lake? Biggest. Sparkle. EVER.',
-        pm: 'Watched grandpa watch the tower. Biggest. Sigh. EVER.',
-        idle: 'One more cast. Okay, two. Okay \u2014 home.'
+        am: 'Chào buổi sáng! Giờ câu. ĐỈNH NHẤT. Cá rô còn chưa tỉnh để mà cãi!',
+        day: 'Anh thấy hồ chưa? Lấp lánh. TO NHẤT. LUÔN.',
+        pm: 'Xem ông nội nhìn ngọn tháp. Thở dài. DÀI NHẤT. LUÔN.',
+        idle: 'Thêm một lần thả nữa. Thôi hai lần. Được rồi \u2014 về nhà.'
       },
       hana: {
-        am: 'Mail\u2019s sorted. Parcels: four. Mysteries: one.',
-        day: 'Welcome to the shop. Prices: fair. Chatter: complimentary.',
-        pm: 'Sunset inventory: one sky, slightly used, no returns.',
-        idle: 'Shop\u2019s closed. Rumors: also closed.'
+        am: 'Thư đã phân loại. Bưu kiện: bốn. Bí ẩn: một.',
+        day: 'Chào mừng đến cửa hàng. Giá cả: hợp lý. Chuyện phiếm: miễn phí.',
+        pm: 'Kiểm kê hoàng hôn: một bầu trời, hơi cũ, không đổi trả.',
+        idle: 'Cửa hàng đóng. Tin đồn: cũng đóng.'
       },
       bramble: {
-        am: 'Hm. Morning. Sheep count: fourteen. Good number.',
-        day: 'Hills are up that way. Hills don\u2019t hurry.',
-        pm: 'Flock drinks at the lake edge. I watch. Same thing, quieter.',
-        idle: 'Sheep are asleep. I count them anyway.'
+        am: 'Hm. Chào buổi sáng. Số cừu: mười bốn. Số đẹp.',
+        day: 'Đồi núi hướng đó đấy. Đồi không vội đâu.',
+        pm: 'Đàn cừu uống nước bờ hồ. Ta canh. Cũng việc đó thôi, yên hơn.',
+        idle: 'Cừu ngủ rồi. Ta vẫn đếm cho chắc.'
       },
       junie: {
-        am: 'That light on the water \u2014 it\u2019s the colour of a held breath.',
-        day: 'I\u2019m mixing a green that only exists here. Don\u2019t tell anyone.',
-        pm: 'The sky\u2019s doing that thing again. I\u2019m not ready to paint it yet.',
-        idle: 'The night has its own palette. I\u2019m just holding the brush.'
+        am: 'Ánh sáng trên mặt nước \u2014 đó là màu của một hơi thở đang nín.',
+        day: 'Tôi đang pha một màu xanh lá chỉ tồn tại ở đây. Đừng nói ai nhé.',
+        pm: 'Bầu trời lại làm trò đó nữa. Tôi chưa sẵn sàng vẽ nó đâu.',
+        idle: 'Đêm có bảng màu riêng. Tôi chỉ là người cầm cọ.'
       }
     };
     var U3 = {
-      mira: 'You\u2019re one of us now, Warden. Extra crust, no charge, forever.',
-      gideon: 'The hive tolerates you now. That\u2019s an honour, mind.',
-      rosa: 'When I was young I never met anyone worth introducing to the ducks.',
-      marlow: 'You listen like a keeper. That\u2019s rarer than you\u2019d think.',
-      finn: 'You\u2019re officially on my crew! Duties: everything. Pay: glory.',
-      hana: 'You get the discount. Don\u2019t ask which one. It\u2019s just fairer.',
-      bramble: 'Hm. You walk quiet. Good for sheep. Good for friends.',
-      junie: 'I painted you into the meadow study. Right by the light.'
+      mira: 'Em là người của làng rồi đấy, Quản lý. Thêm vỏ giòn, miễn phí, mãi mãi.',
+      gideon: 'Bầy ong chấp nhận em rồi. Đó là vinh dự đấy, để ý.',
+      rosa: 'Hồi trẻ tôi chưa từng gặp ai đáng giới thiệu với đám vịt.',
+      marlow: 'Cậu lắng nghe như người giữ đèn. Hiếm hơn cậu tưởng đấy.',
+      finn: 'Anh chính thức vào thủy thủ đoàn của em! Nhiệm vụ: mọi thứ. Lương: vinh quang.',
+      hana: 'Cậu được giảm giá. Đừng hỏi cái nào. Nó công bằng hơn thôi.',
+      bramble: 'Hm. Cậu đi lặng lắm. Tốt cho cừu. Tốt cho bạn bè.',
+      junie: 'Tôi vẽ bạn vào nghiên cứu đồng cỏ. Ngay cạnh ánh sáng.'
     };
     var U6 = {
-      mira: 'I named a loaf after you. It sells out. Don\u2019t let it go to your head.',
-      gideon: 'If anything happens to me, the greenhouse keys are under the thyme.',
-      rosa: 'I\u2019ve written you into my memoirs. Chapter twelve. The good chapter.',
-      marlow: 'If the lamp ever needs a keeper\u2019s hands again\u2026 mine remember.',
-      finn: 'When I\u2019m a famous captain you get free passage. FOREVER.',
-      hana: 'Feelings: back in stock. Limited supply. You\u2019re the reason.',
-      bramble: 'The flock knows your step now. That\u2019s a rare thing to earn.',
-      junie: 'Willowmere has all my colours. You\u2019re one of them.'
+      mira: 'Chị đặt tên em cho một ổ bánh. Nó bán hết sạch. Đừng để nó vào đầu.',
+      gideon: 'Nếu ta có mệnh hệ gì, chìa khóa nhà kính nằm dưới bụi xạ hương.',
+      rosa: 'Tôi đã viết em vào hồi ký của mình. Chương mười hai. Chương đẹp.',
+      marlow: 'Nếu ngọn đèn bao giờ cần đôi tay người giữ đèn nữa\u2026 tay ta vẫn nhớ.',
+      finn: 'Khi em là thuyền trưởng nổi tiếng anh được đi miễn phí. MÃI MÃI.',
+      hana: 'Cảm xúc: đã nhập lại. Số lượng có hạn. Cậu là lý do.',
+      bramble: 'Đàn cừu nhận bước chân cậu rồi. Đó là thứ hiếm kiếm được.',
+      junie: 'Willowmere có đủ mọi màu của tôi. Bạn là một trong số đó.'
     };
     var map = {};
     for (var id in G) {

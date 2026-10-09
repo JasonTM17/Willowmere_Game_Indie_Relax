@@ -22,57 +22,57 @@ window.WStory = (function () {
   /* ---- quest defs (§7 shape) ---- */
   var QUESTS = {
     the_dark_lamp: {
-      id: 'the_dark_lamp', npc: 'hana', title: 'The Dark Lamp of Willowmere',
-      hint: 'Goodwill lights the lamp: 4 Ember Lights, Marlow\u2019s confession, then climb after 20:00.',
+      id: 'the_dark_lamp', npc: 'hana', title: 'Ngọn Đèn Tắt của Willowmere',
+      hint: 'Thiện ý thắp đèn: 4 Ánh Than, lời thú nhận của Marlow, rồi leo lên sau 20:00.',
       embers: 0, state: 'locked', outcomes: null
     },
     honey_loaf: {
-      id: 'honey_loaf', npc: 'mira', title: 'The Honey Loaf',
-      hint: 'Wild honeycomb ripens in the north hives.',
+      id: 'honey_loaf', npc: 'mira', title: 'Ổ Bánh Mật Ong',
+      hint: 'Tổ ong rừng chín ở bầy ong phía bắc.',
       embers: 1, state: 'locked',
-      outcomes: { a: { flag: 'honey_to_mira', label: 'Village loaf' }, b: { flag: 'honey_to_gideon', label: 'Greenhouse bloom' } }
+      outcomes: { a: { flag: 'honey_to_mira', label: 'Ổ bánh của làng' }, b: { flag: 'honey_to_gideon', label: 'Hoa nở nhà kính' } }
     },
     seeds_of_spring: {
-      id: 'seeds_of_spring', npc: 'gideon', title: 'Seeds of Spring',
-      hint: 'A seed pouch was lost on the hill trail, east side.',
+      id: 'seeds_of_spring', npc: 'gideon', title: 'Hạt Giống Mùa Xuân',
+      hint: 'Một túi hạt giống bị rơi trên đường mòn đồi, phía đông.',
       embers: 1, state: 'locked',
-      outcomes: { a: { flag: 'seeds_returned', label: 'Return it' }, b: { flag: 'seeds_gifted', label: 'Slip it to Rosa' } }
+      outcomes: { a: { flag: 'seeds_returned', label: 'Trả lại nó' }, b: { flag: 'seeds_gifted', label: 'Lén đưa cho Rosa' } }
     },
     garden_show: {
-      id: 'garden_show', npc: 'rosa', title: 'The Garden Show',
-      hint: 'A moonbell blooms in the night forest (21:00+) and glows.',
+      id: 'garden_show', npc: 'rosa', title: 'Cuộc Thi Vườn',
+      hint: 'Hoa chuông trăng nở trong rừng đêm (21:00+) và phát sáng.',
       embers: 1, state: 'locked',
-      outcomes: { a: { flag: 'show_won', label: 'Pick it for her' }, b: { flag: 'show_patience', label: 'Grow your own' } }
+      outcomes: { a: { flag: 'show_won', label: 'Hái cho cô ấy' }, b: { flag: 'show_patience', label: 'Tự trồng của mình' } }
     },
     big_one: {
-      id: 'big_one', npc: 'finn', title: 'The Big One',
-      hint: 'The legendary lake fish Siltjaw. One good catch during the quest counts.',
+      id: 'big_one', npc: 'finn', title: 'Chú Cá Khủng',
+      hint: 'Con cá hồ huyền thoại Siltjaw. Một lần câu trúng trong lúc làm nhiệm vụ là đủ.',
       embers: 1, state: 'locked',
-      outcomes: { a: { flag: 'finn_big_one', label: 'Land Siltjaw' }, b: { flag: 'siltjaw_freed', label: 'Let it go' } }
+      outcomes: { a: { flag: 'finn_big_one', label: 'Kéo Siltjaw lên bờ' }, b: { flag: 'siltjaw_freed', label: 'Thả nó đi' } }
     },
     parcel: {
-      id: 'parcel', npc: 'hana', title: 'The Unaddressed Parcel',
-      hint: 'A parcel with no name has sat on the shop counter for two years.',
+      id: 'parcel', npc: 'hana', title: 'Bưu Kiện Không Địa Chỉ',
+      hint: 'Một bưu kiện không tên nằm trên quầy cửa hàng hai năm rồi.',
       embers: 1, state: 'locked',
-      outcomes: { a: { flag: 'parcel_kite', label: 'Open it' }, b: { flag: 'parcel_lens', label: 'Trace the sender' } }
+      outcomes: { a: { flag: 'parcel_kite', label: 'Mở ra' }, b: { flag: 'parcel_lens', label: 'Lần theo người gửi' } }
     },
     lost_lamb: {
-      id: 'lost_lamb', npc: 'bramble', title: 'The Lost Lamb',
-      hint: 'A lamb strayed into the forest after dark (20:00+).',
+      id: 'lost_lamb', npc: 'bramble', title: 'Cừu Con Lạc',
+      hint: 'Một con cừu con lạc vào rừng sau khi trời tối (20:00+).',
       embers: 1, state: 'locked',
-      outcomes: { a: { flag: 'lamb_quiet', label: 'Quiet net-snatch' }, b: { flag: 'lamb_led', label: 'Lantern-led walk' } }
+      outcomes: { a: { flag: 'lamb_quiet', label: 'Chộp lưới lặng lẽ' }, b: { flag: 'lamb_led', label: 'Dắt về bằng đèn lồng' } }
     },
     colors: {
-      id: 'colors', npc: 'junie', title: 'Willowmere in Colour',
-      hint: 'Junie wants the land to show off: visit the vistas.',
+      id: 'colors', npc: 'junie', title: 'Willowmere trong Sắc Màu',
+      hint: 'Junie muốn đất trời khoe màu: đi tham quan các danh lam.',
       embers: 1, state: 'locked',
-      outcomes: { a: { flag: 'junie_stays', label: 'Firefly jar' }, b: { flag: 'junie_leaves', label: 'Dark study' } }
+      outcomes: { a: { flag: 'junie_stays', label: 'Lọ đom đóm' }, b: { flag: 'junie_leaves', label: 'Nghiên cứu bóng tối' } }
     },
     keeper_regret: {
-      id: 'keeper_regret', npc: 'marlow', title: 'The Keeper\u2019s Regret',
-      hint: 'At the lighthouse base in the evening, Marlow finally speaks.',
+      id: 'keeper_regret', npc: 'marlow', title: 'Nỗi Hối Hận của Người Giữ Đèn',
+      hint: 'Ở chân hải đăng buổi tối, Marlow cuối cùng cũng lên tiếng.',
       embers: 1, state: 'locked',
-      outcomes: { a: { flag: 'marlow_comforted', label: 'Never blamed' }, b: { flag: 'marlow_log_open', label: 'The storm' } }
+      outcomes: { a: { flag: 'marlow_comforted', label: 'Chưa từng trách' }, b: { flag: 'marlow_log_open', label: 'Cơn bão' } }
     }
   };
 
@@ -126,7 +126,7 @@ window.WStory = (function () {
     var q = QUESTS.the_dark_lamp;
     if (q.state !== 'done_a' && q.state !== 'done_b') q.state = 'done_a';
     if (window.WAudio) WAudio.sfx('bell');
-    if (window.WHUD) WHUD.toast('The lamp of Willowmere burns again.');
+    if (window.WHUD) WHUD.toast('Ngọn đèn của Willowmere lại cháy sáng.');
   }
 
   function isFestival() {
@@ -142,12 +142,12 @@ window.WStory = (function () {
   /* ---- the attic letter (B2 source of truth_known) ---- */
   function readLetter(env) {
     if (!flag('show_won') && !flag('show_patience')) {
-      if (window.WHUD) WHUD.toast('A small lock. It seems to be waiting for the garden show.');
+      if (window.WHUD) WHUD.toast('Một ổ khóa nhỏ. Hình như nó đang chờ cuộc thi vườn.');
       if (window.WAudio) WAudio.sfx('click');
       return;
     }
     if (flag('truth_known')) {
-      if (window.WHUD) WHUD.toast('The letter is where you left it, read and folded.');
+      if (window.WHUD) WHUD.toast('Lá thư vẫn nằm đúng chỗ bạn để, đã đọc và gấp lại.');
       return;
     }
     if (window.WDialogue && WDialogue.start('shed_letter_1')) {
@@ -189,12 +189,12 @@ window.WStory = (function () {
     if (npcId === 'gideon' && itemKey === 'critter_luna_moth') {
       if (QUESTS.seeds_of_spring.state === 'locked') {
         QUESTS.seeds_of_spring.state = 'available';
-        if (window.WHUD) WHUD.toast('Gideon\u2019s eyes shine \u2014 he mentions his lost seed pouch.');
+        if (window.WHUD) WHUD.toast('Mắt Gideon sáng lên \u2014 ông nhắc đến túi hạt giống bị mất.');
       }
     }
     if (npcId === 'junie' && itemKey === 'mote' && !flag('junie_palette')) {
       setFlag('junie_palette', true);
-      if (window.WHUD) WHUD.toast('Junie holds the mote up to the light, delighted.');
+      if (window.WHUD) WHUD.toast('Junie giơ hạt sáng lên trước ánh sáng, thích thú.');
     }
     if (npcId === 'mira' && itemKey === 'food_honeycomb' &&
         QUESTS.honey_loaf.state === 'locked') {
@@ -208,7 +208,7 @@ window.WStory = (function () {
     var fresh = !flag(k);
     setFlag(k, true);
     if (fresh && QUESTS.colors.state === 'active' && window.WHUD) {
-      WHUD.toast('Junie\u2019s colour notes: ' + vistasSeen() + '/5 vistas.');
+      WHUD.toast('Sổ màu của Junie: ' + vistasSeen() + '/5 danh lam.');
     }
   }
 
@@ -222,9 +222,9 @@ window.WStory = (function () {
   /* item collected — wired by wrapping WAction.add once action.js exists */
   function onCollect(itemKey) {
     var FIRST = {
-      food_honeycomb: 'Wild honeycomb, still humming. Mira could use this.',
-      critter_firefly: 'A lantern with wings \u2014 Junie mentioned sketching these.',
-      moonbell: 'It glows like a lamp that remembers the sun.'
+      food_honeycomb: 'Tổ ong rừng, vẫn còn vo ve. Mira sẽ cần thứ này.',
+      critter_firefly: 'Một chiếc đèn lồng có cánh \u2014 Junie từng nhắc muốn phác thảo chúng.',
+      moonbell: 'Nó phát sáng như ngọn đèn còn nhớ mặt trời.'
     };
     if (FIRST[itemKey] && !flag('got_' + itemKey)) {
       setFlag('got_' + itemKey, true);
@@ -265,7 +265,7 @@ window.WStory = (function () {
       q._emberGiven = true;
       if (q.embers > 0) {
         emberTotal += q.embers;
-        if (window.WHUD) WHUD.toast('An Ember Light joins yours. (' + emberTotal + ')');
+        if (window.WHUD) WHUD.toast('Một Ánh Than hòa vào ánh sáng của bạn. (' + emberTotal + ')');
         if (window.WAudio) WAudio.sfx('bell');
       }
     }
@@ -366,14 +366,14 @@ window.WStory = (function () {
     if (flag('honey_to_mira')) {
       once('_fx_bread', function () {
         allFriendPlusOne();
-        if (window.WHUD) WHUD.toast('The green fills with the smell of shared bread. (+1\u2665 all)');
+        if (window.WHUD) WHUD.toast('Bãi cỏ ngập mùi bánh mì chia nhau. (+1\u2665 tất cả)');
       });
     }
     if (flag('lamb_quiet')) {
       once('_fx_tune', function () {
         if (window.WNpcs) WNpcs.addFriend('bramble', 2);
         if (window.WAudio) WAudio.sfx('tune');
-        if (window.WHUD) WHUD.toast('Bramble teaches you the Shepherd\u2019s Tune.');
+        if (window.WHUD) WHUD.toast('Bramble dạy bạn Khúc Người Chăn Cừu.');
       });
     }
     if (flag('siltjaw_freed')) {
@@ -402,35 +402,35 @@ window.WStory = (function () {
   function epilogueLines() {
     var festival = isFestival();
     var out = [];
-    out.push({ text: festival ? 'The Festival of First Light' : 'The Quiet Keeper', big: true });
+    out.push({ text: festival ? 'Lễ Hội Ánh Sáng Đầu Tiên' : 'Người Giữ Đèn Thầm Lặng', big: true });
     out.push({ text: festival
-      ? 'Word travels faster than lamplight. By the next evening the green is strung with bunting, and Marlow \u2014 who has avoided crowds for two years \u2014 laughs exactly on cue.'
-      : 'The beam turns its slow circle over Willowmere, a little quieter than festivals, a little steadier than fear. The village begins drawing Marlow out, one cup of tea at a time.' });
-    if (flag('honey_to_mira')) out.push({ text: 'Mira bakes the festival loaf tall enough to see from the pier. Nobody minds that it leans.' });
-    if (flag('honey_to_gideon')) out.push({ text: 'The greenhouse blooms out of season, and Gideon pretends not to be proud. He is extremely proud.' });
-    if (flag('seeds_returned')) out.push({ text: 'Gideon\u2019s early sprouts come up in rows so straight you could set a clock by them.' });
-    if (flag('seeds_gifted')) out.push({ text: 'Rosa\u2019s show bed erupts in colour; she sends cuttings back with a note: \u201cFrom a better view.\u201d' });
-    if (flag('show_won')) out.push({ text: 'A moonbell glows at the lighthouse base, replanted where a keeper can see it.' });
-    if (flag('show_patience')) out.push({ text: 'Rosa\u2019s garden blooms on its own schedule, which she declares \u201cshow-winning behaviour\u201d.' });
-    if (flag('finn_big_one')) out.push({ text: 'Siltjaw hangs in the shop, labelled in Finn\u2019s hand: \u201cGRANDPA\u2019S FISH (mostly his).\u201d' });
-    if (flag('siltjaw_freed')) out.push({ text: 'Some nights the pier fills with fireflies, and once \u2014 just once \u2014 a big fin tips the water.' });
-    if (flag('parcel_kite')) out.push({ text: 'A kite flies over the green most afternoons, tied to the shop roof like a flag for no nation.' });
-    if (flag('parcel_lens')) out.push({ text: 'The lens cloth hangs framed by the lamp, folded the way a keeper folds things.' });
-    if (flag('lamb_quiet')) out.push({ text: 'A lamb named Warden follows Bramble\u2019s flock and, occasionally, you.' });
-    if (flag('lamb_led')) out.push({ text: 'The new gate at the forest edge opens easily and closes kindly, like Bramble.' });
-    if (flag('junie_stays')) out.push({ text: 'Junie\u2019s easel stands by the pier most mornings. Willowmere has all her colours.' });
-    if (flag('junie_leaves')) out.push({ text: 'A letter arrives with a city postmark: paintings of a lake, and every single one has a lamp in it.' });
+      ? 'Tin tức còn chạy nhanh hơn ánh đèn. Đến tối hôm sau bãi cỏ đã căng đầy cờ tam giác, còn Marlow \u2014 người tránh đám đông suốt hai năm \u2014 cười đúng một cái thật vang.'
+      : 'Chùm sáng chậm rãi quay trên Willowmere, yên tĩnh hơn lễ hội một chút, vững vàng hơn nỗi sợ một chút. Ngôi làng bắt đầu kéo Marlow ra ngoài, từng tách trà một.' });
+    if (flag('honey_to_mira')) out.push({ text: 'Mira nướng ổ bánh lễ hội cao đến mức nhìn thấy từ bến tàu. Chẳng ai bận tâm nó hơi nghiêng.' });
+    if (flag('honey_to_gideon')) out.push({ text: 'Nhà kính nở hoa trái mùa, còn Gideon giả vờ không tự hào. Ông tự hào cực kỳ.' });
+    if (flag('seeds_returned')) out.push({ text: 'Mầm sớm của Gideon mọc thành từng hàng thẳng đến mức có thể chỉnh đồng hồ theo đó.' });
+    if (flag('seeds_gifted')) out.push({ text: 'Luống dự thi của Rosa bùng nổ sắc màu; bà gửi lại những nhánh giâm kèm ghi chú: \u201cGửi từ một góc nhìn đẹp hơn.\u201d' });
+    if (flag('show_won')) out.push({ text: 'Một đóa chuông trăng phát sáng ở chân hải đăng, được trồng lại nơi người giữ đèn nhìn thấy.' });
+    if (flag('show_patience')) out.push({ text: 'Vườn Rosa nở theo lịch riêng của nó \u2014 điều bà tuyên bố là \u201chành vi đạt giải nhất\u201d.' });
+    if (flag('finn_big_one')) out.push({ text: 'Siltjaw treo trong cửa hàng, nét chữ của Finn: \u201cCÁ CỦA ÔNG NỘI (đa phần là của ông).\u201d' });
+    if (flag('siltjaw_freed')) out.push({ text: 'Vài đêm bến tàu ngập đom đóm, và một lần \u2014 chỉ đúng một lần \u2014 một chiếc vây lớn nhô lên khỏi mặt nước.' });
+    if (flag('parcel_kite')) out.push({ text: 'Một con diều bay trên bãi cỏ hầu hết các buổi chiều, buộc vào mái cửa hàng như lá cờ của một quốc gia không tồn tại.' });
+    if (flag('parcel_lens')) out.push({ text: 'Chiếc khăn lau thấu kính treo đóng khung cạnh ngọn đèn, gấp theo đúng kiểu người giữ đèn gấp đồ.' });
+    if (flag('lamb_quiet')) out.push({ text: 'Một con cừu con tên Warden đi theo đàn của Bramble \u2014 và thỉnh thoảng, theo cả bạn.' });
+    if (flag('lamb_led')) out.push({ text: 'Cánh cổng mới ở rìa rừng mở ra dễ dàng và đóng lại nhẹ nhàng, giống Bramble.' });
+    if (flag('junie_stays')) out.push({ text: 'Giá vẽ của Junie đứng cạnh bến tàu hầu hết các buổi sáng. Willowmere có đủ mọi màu của cô ấy.' });
+    if (flag('junie_leaves')) out.push({ text: 'Một lá thư đến với dấu bưu thành phố: những bức tranh về một hồ nước \u2014 và bức nào cũng có một ngọn đèn trong đó.' });
     if (flag('lens_cloth')) {
-      out.push({ text: 'The lens cloth did its quiet work, and the light came through clean.' });
+      out.push({ text: 'Chiếc khăn lau thấu kính đã làm phần việc thầm lặng của nó, và ánh sáng đi qua trong veo.' });
     } else {
-      out.push({ text: 'You polished the fireglass with your sleeve. It was enough. It was always going to be enough.' });
+      out.push({ text: 'Bạn lau kính lửa bằng ống tay áo. Thế là đủ. Vốn dĩ nó luôn là đủ.' });
     }
-    if (flag('lamp_together')) out.push({ text: 'Marlow keeps the light four nights a week and sleeps properly the other three. You are co-Warden, which mostly means you get the good mug.' });
-    if (flag('lamp_sole')) out.push({ text: 'The lamp is yours now. Marlow leaves tea on your step some mornings, and never once mentions it.' });
-    if (flag('lamp_finn')) out.push({ text: 'Finn Marlow, twelve, is the youngest keeper in county records. He has not stopped grinning.' });
-    if (flag('truth_told')) out.push({ text: 'And the Selkies, wherever they sail, know the cove remembers them.' });
-    if (flag('secret_kept')) out.push({ text: 'The village keeps its myth, and the myth keeps Marlow company.' });
-    if (festival) out.push({ text: 'Come summer: the first Festival of First Light. The committee is already arguing about bunting.' });
+    if (flag('lamp_together')) out.push({ text: 'Marlow trông đèn bốn đêm một tuần và ngủ đúng giấc ba đêm còn lại. Bạn là đồng-Quản lý \u2014 nghĩa chủ yếu là bạn được dùng chiếc cốc đẹp.' });
+    if (flag('lamp_sole')) out.push({ text: 'Ngọn đèn giờ là của bạn. Marlow để lại trà trước bậc cửa vài buổi sáng, và chưa từng nhắc đến.' });
+    if (flag('lamp_finn')) out.push({ text: 'Finn Marlow, mười hai tuổi, là người giữ đèn trẻ nhất trong sổ sách của hạt. Cậu ấy chưa ngừng cười tủm tỉm.' });
+    if (flag('truth_told')) out.push({ text: 'Và đám Selkie, dù đang ra khơi ở đâu, biết rằng vịnh nước vẫn nhớ họ.' });
+    if (flag('secret_kept')) out.push({ text: 'Ngôi làng giữ lấy huyền thoại của mình, và huyền thoại giữ Marlow đỡ cô đơn.' });
+    if (festival) out.push({ text: 'Đến mùa hè: Lễ Hội Ánh Sáng Đầu Tiên đầu tiên. Ban tổ chức đã cãi nhau về chuyện cờ tam giác.' });
     return out;
   }
 
@@ -454,241 +454,241 @@ window.WStory = (function () {
     var m = {};
 
     /* ---- honey_loaf (Mira) ---- */
-    m.q_honey_loaf_hook = N('mira', 'The Honey Loaf needs wild honeycomb \u2014 the north hives. Bring me a piece and the village eats well.', {
+    m.q_honey_loaf_hook = N('mira', 'Ổ Bánh Mật Ong cần tổ ong rừng \u2014 bầy ong phía bắc. Mang cho chị một miếng và cả làng ăn ngon.', {
       requires: { quest: { id: 'honey_loaf', state: 'available' } },
       choices: [
-        C('I\u2019ll see what the hives have.', { setFlags: { honey_loaf_active: 1 } }),
-        C('Maybe later.')
+        C('Em sẽ xem bầy ong có gì.', { setFlags: { honey_loaf_active: 1 } }),
+        C('Để hôm khác vậy.')
       ]
     });
-    m.q_honey_loaf_turnin = N('mira', 'Any luck with the honeycomb, dear?', {
+    m.q_honey_loaf_turnin = N('mira', 'Có tin gì về tổ ong chưa, em?', {
       requires: { quest: { id: 'honey_loaf', state: 'active' } },
       choices: [
-        C('One piece, still warm.', {
+        C('Một miếng đây, còn ấm.', {
           requires: { items: { food_honeycomb: 1 } },
           take: { food_honeycomb: 1 }, setFlags: { honey_to_mira: 1 }, next: 'q_honey_loaf_done'
         }),
-        C('(Trade it to Gideon instead.)', {
+        C('(Đem đổi cho Gideon thay vì vậy.)', {
           requires: { items: { food_honeycomb: 1 } },
           take: { food_honeycomb: 1 }, setFlags: { honey_to_gideon: 1 }, next: 'q_honey_done_b'
         }),
-        C('The bees are still deliberating.')
+        C('Đàn ong vẫn đang bàn bạc.')
       ]
     });
-    m.q_honey_loaf_done = N('mira', 'The whole green will smell like Saturday. Thank you, Warden.');
-    m.q_honey_done_b = N('mira', 'Gideon got it? That man haggles over everything but kindness. Good trade, dear.');
+    m.q_honey_loaf_done = N('mira', 'Cả bãi cỏ sẽ thơm mùi thứ bảy. Cảm ơn em, Quản lý.');
+    m.q_honey_done_b = N('mira', 'Gideon được miếng đó à? Người đó mặc cả mọi thứ, trừ lòng tốt. Đổi tốt đấy, em.');
 
     /* ---- seeds_of_spring (Gideon) ---- */
-    m.q_seeds_of_spring_hook = N('gideon', 'I dropped my seed pouch on the hill trail, east side. A season\u2019s work in one canvas bag.', {
+    m.q_seeds_of_spring_hook = N('gideon', 'Ta làm rơi túi hạt giống trên đường mòn đồi, phía đông. Công một mùa vụ trong một cái túi vải.', {
       requires: { quest: { id: 'seeds_of_spring', state: 'available' } },
       choices: [
-        C('I\u2019ll keep an eye out.', { setFlags: { seeds_asked: 1 } }),
-        C('Maybe later.')
+        C('Em sẽ để mắt tìm.', { setFlags: { seeds_asked: 1 } }),
+        C('Để hôm khác vậy.')
       ]
     });
-    m.q_seeds_of_spring_turnin = N('gideon', 'Anything canvas-shaped on your walks?', {
+    m.q_seeds_of_spring_turnin = N('gideon', 'Trên đường đi có thấy gì hình túi vải không?', {
       requires: { quest: { id: 'seeds_of_spring', state: 'active' } },
       choices: [
-        C('Your seeds, safe and sound.', {
+        C('Hạt giống của ông đây, còn nguyên.', {
           requires: { items: { seeds_pouch: 1 } },
           take: { seeds_pouch: 1 }, setFlags: { seeds_returned: 1 }, next: 'q_seeds_done_a'
         }),
-        C('Still looking.')
+        C('Vẫn đang tìm.')
       ]
     });
-    m.q_seeds_done_a = N('gideon', 'Early sprouts, every row. You have a gatherer\u2019s luck, Warden.');
-    m.q_seeds_done_b = N('rosa', 'Gideon\u2019s seeds, my bed. Between us we\u2019ll feed the whole street.');
+    m.q_seeds_done_a = N('gideon', 'Mầm sớm, hàng nào hàng nấy. Bạn có phúc của người hái lượm đấy, Quản lý.');
+    m.q_seeds_done_b = N('rosa', 'Hạt của Gideon, luống của tôi. Hai chúng ta sẽ nuôi cả con phố này.');
 
     /* ---- garden_show (Rosa) — B also carries the seeds-gift cross-choice ---- */
-    m.q_garden_show_hook = N('rosa', 'The show needs a moonbell \u2014 night forest, after 21:00, glowing. When I was young I\u2019d have run there myself.', {
+    m.q_garden_show_hook = N('rosa', 'Cuộc thi cần một đóa chuông trăng \u2014 rừng đêm, sau 21:00, phát sáng. Hồi trẻ tôi đã tự chạy đến đó rồi.', {
       requires: { quest: { id: 'garden_show', state: 'available' } },
       choices: [
-        C('I\u2019ll pick one for you.', { setFlags: { garden_show_active: 1 } }),
-        C('Maybe later.')
+        C('Em sẽ hái một đóa cho cô.', { setFlags: { garden_show_active: 1 } }),
+        C('Để hôm khác vậy.')
       ]
     });
-    m.q_garden_show_turnin = N('rosa', 'Any glow in your pockets, dear?', {
+    m.q_garden_show_turnin = N('rosa', 'Trong túi có thứ gì phát sáng không, em?', {
       requires: { quest: { id: 'garden_show', state: 'active' } },
       choices: [
-        C('A moonbell, picked from the night forest.', {
+        C('Một đóa chuông trăng, hái trong rừng đêm.', {
           requires: { items: { moonbell: 1 } },
           take: { moonbell: 1 }, setFlags: { show_won: 1 }, next: 'q_garden_done_a'
         }),
-        C('Grow your own, Rosa. I believe in the garden.', {
+        C('Tự trồng của mình đi, Rosa. Em tin vào vườn của cô.', {
           setFlags: { show_patience: 1 }, next: 'q_garden_done_b'
         }),
-        C('(Slip her Gideon\u2019s seed pouch.)', {
+        C('(Lén đưa cô ấy túi hạt của Gideon.)', {
           requires: { items: { seeds_pouch: 1 }, quest: { id: 'seeds_of_spring', state: 'active' } },
           take: { seeds_pouch: 1 }, setFlags: { seeds_gifted: 1 }, next: 'q_seeds_done_b'
         })
       ]
     });
-    m.q_garden_done_a = N('rosa', 'For me? It goes to the show \u2014 then to the lighthouse base, to watch the water.');
-    m.q_garden_done_b = N('rosa', 'Ha! Cheeky. \u2026The garden seems to agree with you, apparently.');
+    m.q_garden_done_a = N('rosa', 'Cho tôi á? Nó sẽ đi dự thi \u2014 rồi về chân hải đăng, ngắm nước.');
+    m.q_garden_done_b = N('rosa', 'Ha! Láo nhé. \u2026Hình như cái vườn lại đồng ý với em, ngộ thật.');
 
     /* ---- big_one (Finn) ---- */
-    m.q_big_one_hook = N('finn', 'Grandpa says Siltjaw\u2019s still in the lake. BIGGEST. FISH. ALIVE. Catch it with me!', {
+    m.q_big_one_hook = N('finn', 'Ông nội bảo Siltjaw vẫn còn trong hồ. CON CÁ. TO NHẤT. CÒN SỐNG. Câu cùng em đi!', {
       requires: { quest: { id: 'big_one', state: 'available' } },
       choices: [
-        C('Deal. One legendary fish.', { setFlags: { big_one_active: 1 } }),
-        C('Maybe later.')
+        C('Chốt. Một con cá huyền thoại.', { setFlags: { big_one_active: 1 } }),
+        C('Để hôm khác vậy.')
       ]
     });
-    m.q_big_one_turnin = N('finn', 'Well?! Is the rod bending?!', {
+    m.q_big_one_turnin = N('finn', 'Sao?! Cần câu có cong không?!', {
       requires: { quest: { id: 'big_one', state: 'active' } },
       choices: [
-        C('(Hold up the catch.) Siltjaw says hello.', {
+        C('(Giơ chiến lợi phẩm lên.) Siltjaw chào cậu nè.', {
           requires: { flags: ['siltjaw_caught'] },
           setFlags: { finn_big_one: 1 }, next: 'q_big_one_done_a'
         }),
-        C('Siltjaw is the lake\u2019s, Finn. Let the legend keep swimming.', {
+        C('Siltjaw là của hồ, Finn à. Để huyền thoại bơi tiếp đi.', {
           setFlags: { siltjaw_freed: 1 }, next: 'q_big_one_done_b'
         })
       ]
     });
-    m.q_big_one_done_a = N('finn', 'DEDICATION: to grandpa, best keeper who ever forgot to sleep. Can we mount it?!');
-    m.q_big_one_done_b = N('finn', '\u2026Okay. Biggest. Respect. EVER. We met it \u2014 and we let it go.');
+    m.q_big_one_done_a = N('finn', 'ĐỀ TẶNG: ông nội, người giữ đèn giỏi nhất từng quên đi ngủ. Có làm mẫu vật treo tường không?!');
+    m.q_big_one_done_b = N('finn', '\u2026Được rồi. Nể phục. LỚN NHẤT. Tụi mình đã gặp nó \u2014 và thả nó đi.');
 
     /* ---- parcel (Hana) ---- */
-    m.q_parcel_hook = N('hana', 'An unaddressed parcel has sat on my counter for two years. Postmistress\u2019s honour: find its home.', {
+    m.q_parcel_hook = N('hana', 'Một bưu kiện không địa chỉ nằm trên quầy tôi hai năm rồi. Danh dự của người trông bưu điện: tìm nhà cho nó.', {
       requires: { quest: { id: 'parcel', state: 'available' } },
       choices: [
-        C('I\u2019ll help solve it.', { setFlags: { parcel_active: 1 } }),
-        C('Maybe later.')
+        C('Em sẽ giúp giải mã.', { setFlags: { parcel_active: 1 } }),
+        C('Để hôm khác vậy.')
       ]
     });
-    m.q_parcel_turnin = N('hana', 'Progress report on the mystery box?', {
+    m.q_parcel_turnin = N('hana', 'Báo cáo tiến độ chiếc hộp bí ẩn nào?', {
       requires: { quest: { id: 'parcel', state: 'active' } },
       choices: [
-        C('Open it. Curiosity wins.', { setFlags: { parcel_kite: 1 }, next: 'q_parcel_done_a' }),
-        C('Trace the sender \u2014 Marlow, maybe?', {
+        C('Mở ra. Tò mò thắng.', { setFlags: { parcel_kite: 1 }, next: 'q_parcel_done_a' }),
+        C('Lần theo người gửi \u2014 có khi là Marlow?', {
           requires: { flags: ['met_marlow'] },
           setFlags: { parcel_lens: 1 }, give: { lens_cloth: 1 }, next: 'q_parcel_done_b'
         })
       ]
     });
-    m.q_parcel_done_a = N('hana', 'A kite. A very good kite. It goes on the shop roof \u2014 house rule now.');
-    m.q_parcel_done_b = N('hana', 'His handwriting. His old lens cloth \u2014 he\u2019d want it near the lamp. Carry it.');
+    m.q_parcel_done_a = N('hana', 'Một con diều. Một con diều rất đẹp. Nó lên mái cửa hàng \u2014 quy tắc mới.');
+    m.q_parcel_done_b = N('hana', 'Nét chữ của ông ấy. Chiếc khăn lau thấu kính cũ \u2014 ông ấy sẽ muốn nó gần ngọn đèn. Mang theo đi.');
 
     /* ---- lost_lamb (Bramble); the scene is a story interactable, night ---- */
-    m.q_lost_lamb_hook = N('bramble', 'One lamb short. Fourteen in, thirteen out. It went north after dark \u2014 I count better in daylight.', {
+    m.q_lost_lamb_hook = N('bramble', 'Thiếu một cừu con. Mười bốn vào, mười ba ra. Nó đi về phía bắc sau khi tối \u2014 ta đếm giỏi hơn ban ngày.', {
       requires: { quest: { id: 'lost_lamb', state: 'available' } },
       choices: [
-        C('I\u2019ll bring it home.', { setFlags: { lost_lamb_active: 1 } }),
-        C('Maybe later.')
+        C('Em sẽ đưa nó về nhà.', { setFlags: { lost_lamb_active: 1 } }),
+        C('Để hôm khác vậy.')
       ]
     });
-    m.q_lost_lamb_turnin = N('bramble', 'Bleating\u2019s in the forest, past the north trail. Follow your ears, not your feet.', {
+    m.q_lost_lamb_turnin = N('bramble', 'Tiếng be be trong rừng, qua đường mòn phía bắc. Đi theo tai, đừng theo chân.', {
       requires: { quest: { id: 'lost_lamb', state: 'active' } }
     });
-    m.q_lost_lamb_scene = N('narrator', 'A small lamb, knee-deep in willow shadow, bleating at the dark like it\u2019s owed an answer.', {
+    m.q_lost_lamb_scene = N('narrator', 'Một con cừu con, lún đến gối trong bóng liễu, be be với bóng tối như thể bóng tối mắc nợ nó một câu trả lời.', {
       choices: [
-        C('(Net-snatch, quick and quiet.)', { setFlags: { lamb_quiet: 1 }, next: 'q_lamb_done_a' }),
-        C('(Lantern up. Walk it home slow.)', { setFlags: { lamb_led: 1 }, give: { wool_cloak: 1 }, next: 'q_lamb_done_b' })
+        C('(Chộp lưới, nhanh và lặng.)', { setFlags: { lamb_quiet: 1 }, next: 'q_lamb_done_a' }),
+        C('(Đèn lồng lên. Dắt về nhà thật chậm.)', { setFlags: { lamb_led: 1 }, give: { wool_cloak: 1 }, next: 'q_lamb_done_b' })
       ]
     });
-    m.q_lamb_done_a = N('bramble', 'Quiet hands. Fourteen again. Meet Warden \u2014 and here\u2019s the Shepherd\u2019s Tune.');
-    m.q_lamb_done_b = N('bramble', 'Lantern-led. Kind way. Take the cloak \u2014 hill wool, rain-proof, mostly.');
+    m.q_lamb_done_a = N('bramble', 'Đôi tay khéo. Lại đủ mười bốn. Làm quen với Warden đi \u2014 và đây là Khúc Người Chăn Cừu.');
+    m.q_lamb_done_b = N('bramble', 'Dắt bằng đèn. Cách tử tế. Cầm lấy áo choàng \u2014 len đồi, chống mưa, phần lớn là vậy.');
 
     /* ---- colors (Junie) ---- */
-    m.q_colors_hook = N('junie', 'I came for one colour and found forty. Show me the vistas \u2014 anywhere the land shows off.', {
+    m.q_colors_hook = N('junie', 'Tôi đến vì một màu và tìm thấy bốn mươi. Dẫn tôi đi xem danh lam \u2014 chỗ nào đất trời khoe màu.', {
       requires: { quest: { id: 'colors', state: 'available' } },
       choices: [
-        C('Challenge accepted.', { setFlags: { colors_active: 1 } }),
-        C('Maybe later.')
+        C('Nhận thử thách.', { setFlags: { colors_active: 1 } }),
+        C('Để hôm khác vậy.')
       ]
     });
     m.q_colors_turnin = N('junie', function () {
       var n = vistasSeen();
-      return 'Seen anything that looked like a held breath? (' + n + '/5 vistas, for my notes.)';
+      return 'Có thấy gì trông như một hơi thở đang nín không? (' + n + '/5 danh lam, ghi vào sổ nhé.)';
     }, {
       requires: { quest: { id: 'colors', state: 'active' } },
       choices: [
-        C('A firefly jar \u2014 sketch them while they glow.', {
+        C('Một lọ đom đóm \u2014 phác thảo chúng lúc đang sáng.', {
           /* §3.2: the quest body is the vistas — both outcomes need >= 4 seen */
           requires: { items: { critter_firefly: 1 }, vistaMin: 4 },
           take: { critter_firefly: 1 }, setFlags: { junie_stays: 1 }, next: 'q_colors_done_a'
         }),
-        C('Paint the dark lighthouse instead. Some colours wait.', {
+        C('Thay vào đó hãy vẽ hải đăng tắt. Có những màu biết chờ.', {
           requires: { vistaMin: 4 },
           setFlags: { junie_leaves: 1 }, next: 'q_colors_done_b'
         })
       ]
     });
-    m.q_colors_done_a = N('junie', 'Willowmere has all my colours. I\u2019m staying \u2014 the easel goes by the pier.');
-    m.q_colors_done_b = N('junie', 'A dark study\u2026 the bravest canvas here. I\u2019ll write from the city. I return for lakes.');
+    m.q_colors_done_a = N('junie', 'Willowmere có đủ mọi màu của tôi. Tôi ở lại \u2014 giá vẽ đặt cạnh bến tàu.');
+    m.q_colors_done_b = N('junie', 'Một nghiên cứu về bóng tối\u2026 bức tranh can đảm nhất ở đây. Tôi sẽ viết thư từ thành phố. Tôi sẽ quay lại vì những hồ nước.');
 
     /* ---- keeper_regret (Marlow) — the confession, plus B2 at the confession ---- */
-    m.q_keeper_regret_hook = N('marlow', 'You keep coming by the tower. So does the guilt. Ask me something, someday. Not today.', {
+    m.q_keeper_regret_hook = N('marlow', 'Cậu cứ ghé tháp hoài. Nỗi tội cũng vậy. Hôm nào đó, hỏi ta điều gì đi. Không phải hôm nay.', {
       requires: { quest: { id: 'keeper_regret', state: 'available' } },
-      choices: [C('(Give him time.)', { setFlags: { keeper_active: 1 } })]
+      choices: [C('(Cho ông ấy thời gian.)', { setFlags: { keeper_active: 1 } })]
     });
-    m.q_keeper_regret_turnin = N('marlow', '\u2026The night the lamp died, I froze. A keeper keeps. I didn\u2019t. Say something, Warden.', {
+    m.q_keeper_regret_turnin = N('marlow', '\u2026Đêm ngọn đèn tắt, ta đông cứng. Người giữ đèn thì phải giữ. Ta đã không. Nói gì đi, Quản lý.', {
       /* §3.2: the confession happens at the lighthouse base, 18-21. The
          schedule parks Marlow there 18:00-21:30 (he arrives walking ~19:20
          from the hills), so the hour gate pins the scene to its time and
          place. */
       requires: { quest: { id: 'keeper_regret', state: 'active' }, hour: [18, 21] },
       choices: [
-        C('The village never blamed you, Marlow.', {
+        C('Làng chưa từng trách ông đâu, Marlow.', {
           setFlags: { marlow_comforted: 1, marlow_confession: 1 }, next: 'q_keeper_done_a'
         }),
-        C('Tell me about the storm.', {
+        C('Kể cho tôi nghe về cơn bão đi.', {
           setFlags: { marlow_log_open: 1, marlow_confession: 1 }, next: 'q_keeper_done_b'
         }),
-        C('The Selkies made port. Rosa kept their letter.', {
+        C('Đám Selkie đã vào bến an toàn. Rosa giữ lá thư của họ.', {
           requires: { flags: ['truth_known'] },
           setFlags: { truth_told: 1 }, next: 'q_truth_told'
         }),
-        C('(Keep the myth. Keep him company instead.)', {
+        C('(Giữ lấy huyền thoại. Ở bên ông ấy thay vào đó.)', {
           setFlags: { secret_kept: 1 }
         })
       ]
     });
-    m.q_keeper_done_a = N('marlow', '\u2026No? Hm. Perhaps blame was only ever mine to hold. Thank you, Warden.');
-    m.q_keeper_done_b = N('marlow', 'Rain like iron. My log page is in a parcel somewhere \u2014 the rest of that story.');
-    m.q_truth_told = N('marlow', 'They MADE port? (He laughs once, like a rope untying.) Come \u2014 the lamp won\u2019t light itself.');
+    m.q_keeper_done_a = N('marlow', '\u2026Không à? Hm. Có lẽ lỗi vốn chỉ là của riêng ta giữ. Cảm ơn, Quản lý.');
+    m.q_keeper_done_b = N('marlow', 'Mưa như sắt. Trang nhật ký của ta nằm trong một bưu kiện đâu đó \u2014 phần còn lại của câu chuyện.');
+    m.q_truth_told = N('marlow', 'Họ VÀO BẾN được à? (Ông bật cười một tiếng, như một sợi dây được tháo nút.) Đi thôi \u2014 ngọn đèn không tự thắp đâu.');
 
     /* ---- climb branch: B2 (the truth) resolves first, then B1 (the keeper).
        When the truth is already known and untold, climb_menu offers it and
        falls through to climb_b1 via failNext; otherwise B1 comes straight up. ---- */
-    m.climb_menu = N('narrator', 'Before the match: the old myth of the storm night sits between you and Marlow.', {
+    m.climb_menu = N('narrator', 'Trước khi châm lửa: huyền thoại cũ về đêm bão nằm giữa bạn và Marlow.', {
       requires: { flags: ['truth_known'], notFlags: ['truth_told', 'secret_kept'] },
       failNext: 'climb_b1',
       choices: [
-        C('Tell him the Selkies made port.', {
+        C('Nói với ông ấy đám Selkie đã vào bến.', {
           setFlags: { truth_told: 1 }, next: 'climb_truth'
         }),
-        C('(Keep the myth. Say only that the lamp waited.)', {
+        C('(Giữ lấy huyền thoại. Chỉ nói rằng ngọn đèn đã đợi.)', {
           setFlags: { secret_kept: 1 }, next: 'climb_secret'
         })
       ]
     });
-    m.climb_b1 = N('narrator', 'The dark lamp waits. Who keeps the light of Willowmere?', {
+    m.climb_b1 = N('narrator', 'Ngọn đèn tắt đang chờ. Ai sẽ giữ ánh sáng của Willowmere?', {
       choices: [
-        C('Light it together.', { setFlags: { lamp_together: 1 }, next: 'climb_together' }),
-        C('This one\u2019s mine. Rest, old friend.', { setFlags: { lamp_sole: 1 }, next: 'climb_sole' }),
-        C('Let Finn strike the match.', {
+        C('Thắp nó cùng nhau.', { setFlags: { lamp_together: 1 }, next: 'climb_together' }),
+        C('Việc này của tôi. Nghỉ ngơi đi, bạn già.', { setFlags: { lamp_sole: 1 }, next: 'climb_sole' }),
+        C('Để Finn quẹt diêm.', {
           requires: { flags: ['finn_big_one'] },
           setFlags: { lamp_finn: 1 }, next: 'climb_finn'
         })
       ]
     });
-    m.climb_together = N('narrator', 'One handle each. The fireglass catches \u2014 Willowmere has two keepers.', { next: 'climb_scene' });
-    m.climb_sole = N('narrator', 'You lift the match alone. Marlow sits down at last, setting down forty years.', { next: 'climb_scene' });
-    m.climb_finn = N('narrator', 'Finn\u2019s hands shake exactly once. The lamp takes the flame like it waited for him.', { next: 'climb_scene' });
-    m.climb_truth = N('narrator', 'The guilt goes out of him like a tide. \u201cThen the letter was true. All of it.\u201d', { next: 'climb_b1' });
-    m.climb_secret = N('narrator', 'Some storms stay untold. You stand with him; the night stands with you both.', { next: 'climb_b1' });
-    m.climb_scene = N('narrator', 'The lamp roars alive. Across the valley, windows light one by one \u2014 pointing home.');
+    m.climb_together = N('narrator', 'Mỗi người một tay cầm. Kính lửa bắt lửa \u2014 Willowmere có hai người giữ đèn.', { next: 'climb_scene' });
+    m.climb_sole = N('narrator', 'Bạn một mình nhấc que diêm. Marlow cuối cùng cũng ngồi xuống, đặt lại bốn mươi năm.', { next: 'climb_scene' });
+    m.climb_finn = N('narrator', 'Tay Finn run đúng một lần. Ngọn đèn đón lấy lửa như thể nó đợi cậu ấy.', { next: 'climb_scene' });
+    m.climb_truth = N('narrator', 'Nỗi tội rời khỏi ông như triều rút. \u201cVậy lá thư là thật. Tất cả đều thật.\u201d', { next: 'climb_b1' });
+    m.climb_secret = N('narrator', 'Có những cơn bão không được kể. Bạn đứng cạnh ông ấy; màn đêm đứng cạnh cả hai.', { next: 'climb_b1' });
+    m.climb_scene = N('narrator', 'Ngọn đèn gầm lên sống dậy. Bên kia thung lũng, từng cửa sổ sáng lên \u2014 chỉ đường về nhà.');
 
     /* ---- the attic letter (B2) ---- */
-    m.shed_letter_1 = N('narrator', 'Behind the seed trays: a salt-stained letter, kept for years, addressed to no one still living here.', { next: 'shed_letter_2' });
-    m.shed_letter_2 = N('narrator', '\u201cTo the keeper \u2014 the Selkies made port in your cove the night of the storm. We live because of you.\u201d', {
+    m.shed_letter_1 = N('narrator', 'Sau những khay hạt giống: một lá thư vệt muối, giữ nhiều năm, gửi cho một người không còn sống ở đây.', { next: 'shed_letter_2' });
+    m.shed_letter_2 = N('narrator', '\u201cGửi người giữ đèn \u2014 đám Selkie đã vào vịnh của anh đêm cơn bão. Chúng tôi sống là nhờ anh.\u201d', {
       setFlags: { truth_known: 1 }
     });
 
     /* ---- bonus node: Junie's mote palette (opened by onGive) ---- */
-    m.junie_palette = N('junie', 'A mote of lake-light\u2026 that\u2019s the exact blue I could never mix. Thank you, Warden.', {
+    m.junie_palette = N('junie', 'Một hạt ánh hồ\u2026 đúng cái màu xanh tôi không bao giờ pha được. Cảm ơn, Quản lý.', {
       setFlag: 'junie_palette_said'
     });
 
@@ -705,12 +705,12 @@ window.WStory = (function () {
     list.push({
       id: 'moonbell',
       x: 21 * WWorld.TILE, y: 20 * WWorld.TILE, w: WWorld.TILE, h: WWorld.TILE + 16,
-      label: 'Pick the moonbell',
+      label: 'Hái hoa chuông trăng',
       requires: { flags: ['garden_show_active'], hour: [21, 24], notFlags: ['moonbell_picked'] },
       onUse: function () {
         if (window.WAction && WAction.add('moonbell', 1)) {
           WStory.setFlag('moonbell_picked', true);
-          if (window.WHUD) WHUD.toast('A moonbell, glowing like a lamp that remembers the sun.');
+          if (window.WHUD) WHUD.toast('Một đóa chuông trăng, sáng như ngọn đèn còn nhớ mặt trời.');
           if (window.WAudio) WAudio.sfx('sparkle');
         }
       }
@@ -718,7 +718,7 @@ window.WStory = (function () {
     list.push({
       id: 'lost_lamb',
       x: 26 * WWorld.TILE, y: 26 * WWorld.TILE, w: WWorld.TILE, h: WWorld.TILE + 16,
-      label: 'Approach the lamb',
+      label: 'Đến gần cừu con',
       requires: { flags: ['lost_lamb_active'], hour: [20, 24], notFlags: ['lamb_quiet', 'lamb_led'] },
       onUse: function () {
         if (window.WDialogue && WDialogue.start('q_lost_lamb_scene')) {

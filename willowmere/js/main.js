@@ -79,7 +79,7 @@ window.WGame = (function () {
         WDialogue.start('sleep_offer');
         if (WDialogue.active()) state = 'DIALOGUE';
       } else {
-        WHUD.toast('Too bright to sleep yet \u2014 come back after 18:00.');
+        WHUD.toast('Trời còn sáng lắm \u2014 quay lại sau 18:00 nhé.');
         WAudio.sfx('click');
       }
     };
@@ -146,7 +146,7 @@ window.WGame = (function () {
     state = 'PLAY';
     if (won && !WStory.flag('arcade_dawn_seen')) {
       WStory.setFlag('arcade_dawn_seen', true);
-      WHUD.toast('The cabinet screen dims, warmer somehow. Whatever slept in that grid just woke.');
+      WHUD.toast('Màn hình chiếc tủ dịu xuống, ấm hơn hẳn. Thứ gì đó vừa thức dậy trong lưới neon.');
       WAudio.sfx('chime');
     } else {
       WAudio.sfx('click');
@@ -194,7 +194,7 @@ window.WGame = (function () {
 
   function continueGame() {
     var d = readSave();
-    if (!d) { WHUD.toast('The save could not be read.'); return; }
+    if (!d) { WHUD.toast('Không đọc được file lưu.'); return; }
     WStory.reset();
     WAction.reset();
     WWorld.build();
@@ -238,7 +238,7 @@ window.WGame = (function () {
     syncEnv();
     WHUD.resetWatchers();
     WHUD.clearToasts();
-    WHUD.toast('Welcome back to Willowmere.');
+    WHUD.toast('Chào mừng trở lại Willowmere.');
     state = 'PLAY';
   }
 
@@ -284,7 +284,7 @@ window.WGame = (function () {
       vistas: vistas
     };
     var ok = WU.save(SAVE_KEY, data);
-    if (!silent) WHUD.toast(ok ? 'Game saved.' : 'Saving is unavailable here (file:// may block storage).');
+    if (!silent) WHUD.toast(ok ? 'Đã lưu.' : 'Không lưu được ở đây (file:// có thể chặn bộ nhớ).');
     hasSave = !!ok;
     return ok;
   }
@@ -313,7 +313,7 @@ window.WGame = (function () {
       env.weather = WWorld.weatherRoll(env.day);
       WParticles.clear();
       saveGame(true);
-      WHUD.toast('Day ' + env.day + ' \u2014 06:30. ' + (env.weather === 'rain' ? 'Rain taps the roof.' : 'Clear morning light.'));
+      WHUD.toast('Ngày ' + env.day + ' \u2014 06:30. ' + (env.weather === 'rain' ? 'Mưa gõ trên mái.' : 'Nắng sớm trong vắt.'));
     } else if (sleepFx.phase === 1 && sleepFx.t >= 1) {
       sleepFx.active = false;
       env.frozen = false;
@@ -390,7 +390,7 @@ window.WGame = (function () {
     var n = WNpcs.nearestTo(px, py, 60);
     if (n) {
       best = { kind: 'npc', obj: n, x: n.x, y: n.y - 40,
-        label: 'Talk to ' + n.def.name.split(' ')[0], d: WU.dist(px, py, n.x, n.y) };
+        label: 'Nói chuyện với ' + n.def.name.split(' ')[0], d: WU.dist(px, py, n.x, n.y) };
     }
     var it = WWorld.nearestInteractable(px, py);
     if (it) {
@@ -546,7 +546,7 @@ window.WGame = (function () {
         env.hour -= 24;
         env.day += 1;
         env.weather = WWorld.weatherRoll(env.day);
-        WHUD.toast('Day ' + env.day + '.');
+        WHUD.toast('Ngày ' + env.day + '.');
       }
     }
     clearExpiredRain();
@@ -699,7 +699,7 @@ window.WGame = (function () {
       if (epi.scroll < 1) epi.scroll = 1;
       else {
         state = 'PLAY';
-        WHUD.toast('Free play \u2014 the lamp is lit. The village is yours.');
+        WHUD.toast('Chơi tự do \u2014 ngọn đèn đã sáng. Ngôi làng là của bạn.');
       }
     }
   }

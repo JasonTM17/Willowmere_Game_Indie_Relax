@@ -10,29 +10,29 @@ window.WAction = (function () {
 
   /* ---- item registry (§5.4) ---- */
   var ITEMS = {
-    critter_butterfly: { name: 'Butterfly', desc: 'Meadow wings, 7:00\u201317:00.', kind: 'critter' },
-    critter_cricket: { name: 'Cricket', desc: 'Evening fiddler, 18:00\u201323:00.', kind: 'critter' },
-    critter_oak_beetle: { name: 'Oak Beetle', desc: 'Forest shiny, 8:00\u201317:00.', kind: 'critter' },
-    critter_firefly: { name: 'Firefly', desc: 'Forest lantern, 20:00\u201302:00.', kind: 'critter' },
-    critter_luna_moth: { name: 'Luna Moth', desc: 'Rare pale moth, 21:00\u201302:00.', kind: 'critter' },
-    critter_dragonfly: { name: 'Dragonfly', desc: 'Lake dart, 9:00\u201317:00.', kind: 'critter' },
-    critter_mayfly: { name: 'Mayfly', desc: 'Lake dusk swirl, 17:00\u201320:00.', kind: 'critter' },
-    critter_sand_crab: { name: 'Sand Crab', desc: 'Beach sideways walker, 7:00\u201318:00.', kind: 'critter' },
-    critter_glow_worm: { name: 'Glow Worm', desc: 'Beach night bead, 20:00\u201302:00.', kind: 'critter' },
-    critter_grasshopper: { name: 'Grasshopper', desc: 'Hills jumper, 7:00\u201317:00.', kind: 'critter' },
-    fish_minnow: { name: 'Minnow', desc: 'Any water, day.', kind: 'fish' },
-    fish_perch: { name: 'Perch', desc: 'Lake, 8:00\u201318:00.', kind: 'fish' },
-    fish_flounder: { name: 'Flounder', desc: 'Sea, 7:00\u201317:00.', kind: 'fish' },
-    fish_trout: { name: 'Trout', desc: 'Lake at dusk.', kind: 'fish' },
-    fish_carp: { name: 'Carp', desc: 'Lake at night.', kind: 'fish' },
-    fish_moonfish: { name: 'Moonfish', desc: 'Rare night silver.', kind: 'fish' },
-    mote: { name: 'Light Mote', desc: 'A willow-wisp caught mid-drift.', kind: 'treasure' },
-    food_honeycomb: { name: 'Honeycomb', desc: 'Wild honey, still humming.', kind: 'food' },
-    seeds_pouch: { name: 'Seed Pouch', desc: "Gideon's canvas pouch of seeds.", kind: 'key' },
-    moonbell: { name: 'Moonbell', desc: 'Night forest bloom that glows.', kind: 'treasure' },
-    lens_cloth: { name: 'Lens Cloth', desc: "A keeper's polishing cloth.", kind: 'key' },
-    wool_cloak: { name: 'Wool Cloak', desc: 'Hill wool, rain-proof, mostly.', kind: 'key' },
-    letter: { name: 'Weathered Letter', desc: 'Salt-stained, kept for years.', kind: 'key' }
+    critter_butterfly: { name: 'Bướm', desc: 'Cánh đồng cỏ, 7:00\u201317:00.', kind: 'critter' },
+    critter_cricket: { name: 'Dế', desc: 'Nhạc công buổi tối, 18:00\u201323:00.', kind: 'critter' },
+    critter_oak_beetle: { name: 'Bọ sồi', desc: 'Bóng loáng rừng, 8:00\u201317:00.', kind: 'critter' },
+    critter_firefly: { name: 'Đom đóm', desc: 'Đèn lồng rừng, 20:00\u201302:00.', kind: 'critter' },
+    critter_luna_moth: { name: 'Bướm trăng', desc: 'Bướm nhạt quý hiếm, 21:00\u201302:00.', kind: 'critter' },
+    critter_dragonfly: { name: 'Chuồn chuồn', desc: 'Mũi tên của hồ, 9:00\u201317:00.', kind: 'critter' },
+    critter_mayfly: { name: 'Phù du', desc: 'Đàn chạng vạng trên hồ, 17:00\u201320:00.', kind: 'critter' },
+    critter_sand_crab: { name: 'Cua cát', desc: 'Kẻ đi ngang bãi biển, 7:00\u201318:00.', kind: 'critter' },
+    critter_glow_worm: { name: 'Sâu phát sáng', desc: 'Hạt sáng bãi đêm, 20:00\u201302:00.', kind: 'critter' },
+    critter_grasshopper: { name: 'Châu chấu', desc: 'Vận động viên nhảy đồi, 7:00\u201317:00.', kind: 'critter' },
+    fish_minnow: { name: 'Cá tép', desc: 'Mọi vùng nước, ban ngày.', kind: 'fish' },
+    fish_perch: { name: 'Cá rô', desc: 'Hồ, 8:00\u201318:00.', kind: 'fish' },
+    fish_flounder: { name: 'Cá bơn', desc: 'Biển, 7:00\u201317:00.', kind: 'fish' },
+    fish_trout: { name: 'Cá hồi', desc: 'Hồ lúc chạng vạng.', kind: 'fish' },
+    fish_carp: { name: 'Cá chép', desc: 'Hồ ban đêm.', kind: 'fish' },
+    fish_moonfish: { name: 'Cá trăng', desc: 'Bạc đêm quý hiếm.', kind: 'fish' },
+    mote: { name: 'Hạt Sáng', desc: 'Bóng liễu bị giữ lại giữa dòng trôi.', kind: 'treasure' },
+    food_honeycomb: { name: 'Miếng tổ ong', desc: 'Mật rừng, vẫn còn vo ve.', kind: 'food' },
+    seeds_pouch: { name: 'Túi hạt giống', desc: 'Túi vải hạt giống của Gideon.', kind: 'key' },
+    moonbell: { name: 'Hoa chuông trăng', desc: 'Đóa hoa rừng đêm phát sáng.', kind: 'treasure' },
+    lens_cloth: { name: 'Khăn lau thấu kính', desc: 'Khăn đánh bóng của người giữ đèn.', kind: 'key' },
+    wool_cloak: { name: 'Áo choàng len', desc: 'Len đồi, chống mưa — phần lớn là vậy.', kind: 'key' },
+    letter: { name: 'Lá thư cũ', desc: 'Vệt muối loang, được giữ nhiều năm.', kind: 'key' }
   };
 
   /* Inventory-lite: 24 slots (distinct item kinds, §5.4 cap), each holding
@@ -71,63 +71,63 @@ window.WAction = (function () {
   /* gift result lines, per NPC voice (§3.1) */
   var GIFT_LINES = {
     mira: {
-      loved: 'Oh \u2014 you sweet thing. This goes straight into tomorrow\u2019s bake.',
-      liked: 'For me? I\u2019ll take that with tea, thank you kindly.',
-      neutral: 'Well now. That\u2019s\u2026 thoughtful, dear.',
-      disliked: 'Oh dear. Crickets. I\u2019ll\u2026 find them a home far away.'
+      loved: 'Ôi \u2014 em thật đáng yêu. Món này đi thẳng vào mẻ nướng ngày mai.',
+      liked: 'Cho chị á? Chị sẽ dùng nó với trà, cảm ơn em nhiều.',
+      neutral: 'Trời ạ. Cũng\u2026 chu đáo lắm, em à.',
+      disliked: 'Ôi em ơi. Dế à. Chị sẽ\u2026 tìm cho chúng một mái nhà thật xa.'
     },
     gideon: {
-      loved: 'Hm. Rooted in good soil, this one. It\u2019ll do well on my sill.',
-      liked: 'A lantern with wings. The greenhouse approves.',
-      neutral: 'Not thyme. Not harmful. Accepted.',
-      disliked: 'Carp. Pond-fattened and proud of it. The compost will learn.'
+      loved: 'Hm. Gieo trong đất tốt, thứ này. Nó sẽ tốt trên bệ cửa ta.',
+      liked: 'Một chiếc đèn lồng có cánh. Nhà kính tán thành.',
+      neutral: 'Không phải cỏ xạ hương. Không hại. Chấp nhận.',
+      disliked: 'Cá chép. Béo ao và tự mãn. Đống phân sẽ rút ra bài học.'
     },
     rosa: {
-      loved: 'When I was young I chased moths. Now they come to me \u2014 you see?',
-      liked: 'Honeycomb! The ducks will be jealous and I will not care.',
-      neutral: 'How whimsical. It goes on the windowsill of honour.',
-      disliked: 'A flounder? Darling, I taught for forty years. I know a flat disappointment.'
+      loved: 'Hồi còn trẻ tôi đuổi theo bướm. Giờ chúng đến tìm tôi \u2014 thấy chưa?',
+      liked: 'Miếng tổ ong! Đám vịt sẽ ghen tị và tôi chẳng quan tâm.',
+      neutral: 'Quái gở thật. Nó lên bệ cửa sổ danh dự.',
+      disliked: 'Cá bơn á? Cưng à, tôi dạy học bốn mươi năm. Tôi biết thế nào là thất vọng dẹp.'
     },
     marlow: {
-      loved: 'A glow-worm. Small light, kept going. Aye \u2014 that\u2019s the whole trade.',
-      liked: 'Moonfish by night. The lamp used to call them little moons.',
-      neutral: 'Kind of you. I\u2019ve no room to dislike anything, these days.',
+      loved: 'Sâu phát sáng. Ánh sáng nhỏ, vẫn cháy. Aye \u2014 đó là cả nghề đấy.',
+      liked: 'Cá trăng ban đêm. Ngọn đèn từng gọi chúng là những vầng trăng nhỏ.',
+      neutral: 'Tốt bụng đấy. Ta chẳng còn chỗ mà ghét thứ gì nữa, những ngày này.',
       disliked: ''
     },
     finn: {
-      loved: 'A FISH?! Best. Gift. EVER. It\u2019s going on the crew flag!',
-      liked: 'A dragonfly! It\u2019s like a tiny kite with opinions!',
-      neutral: 'Ooh. Shiny-ish. Officially cargo now.',
-      disliked: 'Honeycomb? Sticky paws, no thanks \u2014 you hold it, I\u2019ll supervise.'
+      loved: 'MỘT CON CÁ?! Quà đỉnh nhất LUÔN! Treo lên cờ thủy thủ đoàn!',
+      liked: 'Chuồn chuồn! Như một con diều tí hon có ý kiến riêng!',
+      neutral: 'Ooo. Sáng bóng-đại-khái. Chính thức là hàng hóa rồi.',
+      disliked: 'Tổ ong á? Dính nhớp tay, thôi cảm ơn \u2014 anh cầm đi, em giám sát.'
     },
     hana: {
-      loved: 'A sand crab. Reliable. Carries its house. I respect that.',
-      liked: 'A light mote. Inventory: one small star. Filed.',
-      neutral: 'Noted, logged, appreciated. Mostly logged.',
-      disliked: 'Mayflies. They cluster. Like rumors. Take them back outside.'
+      loved: 'Cua cát. Đáng tin. Tự mang nhà theo người. Tôi nể điều đó.',
+      liked: 'Hạt sáng. Kho: một ngôi sao nhỏ. Đã nhập sổ.',
+      neutral: 'Ghi nhận, nhập sổ, cảm kích. Chủ yếu là nhập sổ.',
+      disliked: 'Phù du. Chúng bầy đàn. Như tin đồn. Mang ra ngoài lại đi.'
     },
     bramble: {
-      loved: 'Hm. Grasshopper. Fourteen legs of patience. Good gift.',
-      liked: 'Hill wool would like you. This helps.',
-      neutral: 'Hm. Accepted.',
-      disliked: 'Oak beetle. Bites wool. The flock votes no.'
+      loved: 'Hm. Châu chấu. Mười bốn cái chân kiên nhẫn. Quà tốt.',
+      liked: 'Len đồi sẽ thích anh. Món này giúp ích đấy.',
+      neutral: 'Hm. Chấp nhận.',
+      disliked: 'Bọ sồi. Cắn len. Đàn cừu bỏ phiếu chống.'
     },
     junie: {
-      loved: 'A firefly \u2014 that\u2019s the exact green I could never mix. Thank you.',
-      liked: 'Oh. A little colour that agreed to be carried.',
-      neutral: 'That sky is a held breath. So is this. Thank you.',
+      loved: 'Đom đóm \u2014 đúng cái màu xanh mà tôi không bao giờ pha được. Cảm ơn.',
+      liked: 'Ô. Một chút màu sắc đồng ý được mang đi.',
+      neutral: 'Bầu trời kia là một hơi thở đang nín. Thứ này cũng vậy. Cảm ơn.',
       disliked: ''
     }
   };
   var AGAIN_LINES = {
-    mira: 'One gift a day from you is plenty, dear \u2014 save some kindness.',
-    gideon: 'One offering a day. Even bees ration the pollen.',
-    rosa: 'Twice in one day? When I was young we called that showing off.',
-    marlow: 'You\u2019ve given enough today. So have the tides.',
-    finn: 'Whoa, two? My pockets \u2014 I mean YOUR pockets \u2014 have limits!',
-    hana: 'Daily limit reached. Restocking tomorrow.',
-    bramble: 'Hm. Once a day. Good number.',
-    junie: 'One is a gift. Two is a collection. Tomorrow, maybe.'
+    mira: 'Một món quà mỗi ngày từ em là vừa đủ rồi \u2014 giữ bớt lòng tốt lại.',
+    gideon: 'Một lễ mỗi ngày. Ong còn phải phân chia phấn hoa.',
+    rosa: 'Hai lần một ngày? Hồi đó chúng tôi gọi thế là khoe khoang.',
+    marlow: 'Anh cho đủ hôm nay rồi. Thủy triều cũng vậy.',
+    finn: 'Oa, hai cái á? Túi em \u2014 ý em là túi ANH \u2014 có giới hạn!',
+    hana: 'Đạt giới hạn ngày. Nhập hàng lại vào mai.',
+    bramble: 'Hm. Một ngày một lần. Số đẹp.',
+    junie: 'Một là quà. Hai là bộ sưu tập. Mai nhé.'
   };
   /* friendship per gift tier — DESIGN.md §3 table */
   var TIER_HEARTS = { loved: 2, liked: 1, neutral: 0.5, disliked: -0.5 };
@@ -177,13 +177,13 @@ window.WAction = (function () {
     if (!ITEMS[key] || !window.WHUD) return false;
     if (!inventory[key]) {
       if (kindCount() >= MAX_KINDS) {
-        WHUD.toast('Your pouch is full \u2014 24 kinds at most.');
+        WHUD.toast('Túi đồ đầy rồi \u2014 tối đa 24 loại.');
         return false;
       }
       inventory[key] = 0;
     }
     inventory[key] = Math.min(MAX_STACK, inventory[key] + n);
-    WHUD.toast('Received: ' + ITEMS[key].name + ' \u00d7' + inventory[key]);
+    WHUD.toast('Nhận được: ' + ITEMS[key].name + ' \u00d7' + inventory[key]);
     return true;
   }
 
@@ -323,7 +323,7 @@ window.WAction = (function () {
     if (c && (!m || WU.dist(px, py, c.x, c.y) <= WU.dist(px, py, m.x, m.y))) {
       return { kind: 'critter', obj: c, x: c.x, y: c.y, label: 'Catch ' + ITEMS[c.id].name };
     }
-    if (m) return { kind: 'mote', obj: m, x: m.x, y: m.y, label: 'Gather light' };
+    if (m) return { kind: 'mote', obj: m, x: m.x, y: m.y, label: 'Hứng ánh sáng' };
     return null;
   }
 
@@ -432,7 +432,7 @@ window.WAction = (function () {
         var v = DIRV[player.dir] || DIRV.down;
         var fx = player.x + v[0] * 40, fy = player.y + v[1] * 40;
         if (!world.waterAt(fx, fy)) {
-          if (window.WHUD) WHUD.toast('Face open water to cast.');
+          if (window.WHUD) WHUD.toast('Quay mặt ra nước để thả câu.');
           return;
         }
         var tx = ((fx / world.TILE) | 0) * world.TILE + world.TILE / 2;
@@ -472,7 +472,7 @@ window.WAction = (function () {
             }
           }
         } else {
-          if (window.WHUD) WHUD.toast('It got away\u2026');
+          if (window.WHUD) WHUD.toast('Nó tuột mất rồi\u2026');
           WAudio.sfx('splash');
         }
         fish.state = 'idle';
@@ -494,7 +494,7 @@ window.WAction = (function () {
       fish.biteT -= dt;
       if (fish.biteT <= 0) {
         fish.state = 'idle';
-        if (window.WHUD) WHUD.toast('It slipped away quietly.');
+        if (window.WHUD) WHUD.toast('Nó lặng lẽ trốn mất.');
       }
     } else if (fish.state === 'reel') {
       fish.reelT += dt;
@@ -502,7 +502,7 @@ window.WAction = (function () {
       fish.marker = 0.5 + 0.5 * Math.sin(fish.markerT * WU.TAU * 1.2);  // 1.2 Hz
       if (fish.reelT > 2.5) {
         fish.state = 'idle';
-        if (window.WHUD) WHUD.toast('The line went slack. It got away\u2026');
+        if (window.WHUD) WHUD.toast('Dây chùng xuống. Nó tuột mất rồi\u2026');
         WAudio.sfx('splash');
       }
     }
@@ -593,7 +593,7 @@ window.WAction = (function () {
       if (inst) { def = inst.def; pos = inst; }
     }
     if (!ITEMS[itemKey] || count(itemKey) <= 0) {
-      return { line: 'You reach for it, but your pouch is empty.', delta: 0, tier: 'none' };
+      return { line: 'Bạn đưa tay tới, nhưng túi đồ trống.', delta: 0, tier: 'none' };
     }
     var env = lastEnv || { day: 1 };
     var day = env.day || 1;
@@ -611,11 +611,11 @@ window.WAction = (function () {
     var line;
     if (again) {
       delta = 0;
-      line = AGAIN_LINES[npcId] || 'One gift a day \u2014 it keeps the giving kind.';
+      line = AGAIN_LINES[npcId] || 'Một món quà mỗi ngày \u2014 giữ cho việc cho đi vẫn ấm áp.';
     } else {
       giftDay[npcId] = day;
       var pool = (GIFT_LINES[npcId] && GIFT_LINES[npcId][tier]) || '';
-      line = pool || 'Thank you, Warden.';
+      line = pool || 'Cảm ơn, Quản lý.';
     }
     remove(itemKey, 1);                          // the gift leaves the pouch
     if (window.WNpcs) WNpcs.addFriend(npcId, delta);

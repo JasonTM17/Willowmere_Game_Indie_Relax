@@ -82,7 +82,7 @@ window.WNpcs = (function () {
       greetings: { morning: 'rosa_am', day: 'rosa_day', evening: 'rosa_pm' }
     },
     {
-      id: 'marlow', name: 'Old Marlow', role: 'former keeper', homePoi: 'marlow_hut_door',
+      id: 'marlow', name: 'Marlow già', role: 'former keeper', homePoi: 'marlow_hut_door',
       spriteRow: 4, voice: 'marlow', speed: 42,
       /* §3.1: 5-8 tide pools · 8-11 hut · 11-15 driftwood loop · 15-18 hut ·
          18-21 lighthouse base · 21+ hut. The engine walks at real-time
@@ -213,59 +213,59 @@ window.WNpcs = (function () {
      am_lamp fires in the short window where both stand at the tower base. ---- */
   var PAIRS = [
     { id: 'am_honey', a: 'mira', b: 'gideon', poi: 'green_well', hour: [11, 13], requires: null, lines: [
-      { sp: 'mira', text: 'Forty years, Gideon, and you still haggle over honey.' },
-      { sp: 'gideon', text: 'Forty years, and it is still overpriced thistle syrup.' },
-      { sp: 'mira', text: 'And yet the loaf never skips a week.' },
-      { sp: 'gideon', text: 'Hm. Neither do I.' }
+      { sp: 'mira', text: 'Bốn mươi năm rồi, Gideon, và ông vẫn mặc cả mật ong.' },
+      { sp: 'gideon', text: 'Bốn mươi năm, và nó vẫn là xi-rô chỉ thiên giá chát.' },
+      { sp: 'mira', text: 'Vậy mà ổ bánh chưa bao giờ nghỉ tuần nào.' },
+      { sp: 'gideon', text: 'Hm. Ta cũng vậy.' }
     ] },
     { id: 'am_ducks', a: 'finn', b: 'rosa', poi: 'pier', hour: [9.5, 13], requires: null, lines: [
-      { sp: 'finn', text: 'Rosa! The big one \u2014 that is Kevin, I would bet my rod!' },
-      { sp: 'rosa', text: 'When I was young, ducks never had names. Now I know six.' },
-      { sp: 'finn', text: 'Kevin. Kevin. KEVIN. He remembers me, watch!' },
-      { sp: 'rosa', text: 'He remembers the bread, dear. Let him.' }
+      { sp: 'finn', text: 'Rosa! Con to đùng kia \u2014 là Kevin, em cá cả cần câu đấy!' },
+      { sp: 'rosa', text: 'Hồi trẻ, vịt không bao giờ có tên. Giờ tôi biết sáu con.' },
+      { sp: 'finn', text: 'Kevin. Kevin. KEVIN. Nó nhớ em, nhìn này!' },
+      { sp: 'rosa', text: 'Nó nhớ bánh mì đấy, cưng. Để nó nhớ.' }
     ] },
     { id: 'am_post', a: 'hana', b: 'mira', poi: 'bakery_door', hour: [8.4, 9], requires: null, lines: [
-      { sp: 'hana', text: 'Three parcels, one summons, zero pastries reserved.' },
-      { sp: 'mira', text: 'One parcel, and I will trade you a heel of honey loaf.' },
-      { sp: 'hana', text: 'Feelings: out of stock. Carbs: overstocked. Deal.' }
+      { sp: 'hana', text: 'Ba bưu kiện, một giấy triệu tập, không bánh ngọt được giữ.' },
+      { sp: 'mira', text: 'Một bưu kiện đi, tôi đổi cho cô một đầu ổ bánh mật ong.' },
+      { sp: 'hana', text: 'Cảm xúc: hết hàng. Tinh bột: tồn kho dư. Chốt.' }
     ] },
     /* kept for §3.3 fidelity; unreachable on the restored schedules (see NOTE) */
     { id: 'am_tide', a: 'marlow', b: 'bramble', poi: 'tide_pools', hour: [5, 8], requires: null, lines: [
-      { sp: 'marlow', text: 'A keeper keeps. I keep meaning to say something.' },
-      { sp: 'bramble', text: 'Hm. Fourteen herons this morning. Good number.' },
-      { sp: 'marlow', text: 'Kettle is on, if your silence wants company.' },
-      { sp: 'bramble', text: 'It does.' }
+      { sp: 'marlow', text: 'Người giữ đèn thì phải giữ. Ta cứ định nói gì đó.' },
+      { sp: 'bramble', text: 'Hm. Mười bốn con diệc sáng nay. Số đẹp.' },
+      { sp: 'marlow', text: 'Ấm nước đang sôi, nếu sự im lặng của ông muốn bạn đồng hành.' },
+      { sp: 'bramble', text: 'Nó muốn.' }
     ] },
     /* lost its overlap when Finn's §3.1 green-games beat came back */
     { id: 'am_forecast', a: 'finn', b: 'hana', poi: 'dock', hour: [19, 21], requires: null, lines: [
-      { sp: 'finn', text: 'Biggest. Fog. EVER. Tomorrow. I feel it in my boots!' },
-      { sp: 'hana', text: 'Forecast: clouds, with a chance of you being right once.' },
-      { sp: 'finn', text: 'You will SEE. And then you will owe me a ta\u2026 a compliment.' },
-      { sp: 'hana', text: 'Rain check.' }
+      { sp: 'finn', text: 'Sương mù. TO NHẤT. LUÔN. Ngày mai. Em cảm trong đôi ủng!' },
+      { sp: 'hana', text: 'Dự báo: có mây, kèm xác suất cậu đúng được một lần.' },
+      { sp: 'finn', text: 'Cô sẽ THẤY. Và rồi cô sẽ nợ em một cái bánh tà\u2026 một lời khen.' },
+      { sp: 'hana', text: 'Hẹn hôm mưa.' }
     ] },
     { id: 'am_colors', a: 'junie', b: 'rosa', poi: 'green_well', hour: [16.9, 17.6],
       requires: { flags: ['met_junie'] }, lines: [
-      { sp: 'junie', text: 'Your garden is a held breath, Rosa. A whole palette.' },
-      { sp: 'rosa', text: 'When I was young I called it weeds. Age improved my eye.' },
-      { sp: 'junie', text: 'Age is just a longer sketchbook.' }
+      { sp: 'junie', text: 'Vườn của cô là một hơi thở đang nín, Rosa. Cả một bảng màu.' },
+      { sp: 'rosa', text: 'Hồi trẻ tôi gọi nó là cỏ dại. Tuổi tác đã cải thiện mắt tôi.' },
+      { sp: 'junie', text: 'Tuổi chỉ là một cuốn sổ phác dài hơn thôi.' }
     ] },
     { id: 'am_seeds_a', a: 'gideon', b: 'rosa', poi: 'green_bench', hour: [18, 20.5],
       requires: { quest: { id: 'seeds_of_spring', state: 'done_a' } }, lines: [
-      { sp: 'gideon', text: 'She brought my seeds home. Early sprouts, every row.' },
-      { sp: 'rosa', text: 'And you shared the cuttings back. Circle closed.' },
-      { sp: 'gideon', text: 'Good soil. Good courier. Good number of sprouts: all.' }
+      { sp: 'gideon', text: 'Quản lý mới mang hạt của ta về. Mầm sớm, hàng nào hàng nấy.' },
+      { sp: 'rosa', text: 'Và ông chia lại giâm cành. Vòng khép kín.' },
+      { sp: 'gideon', text: 'Đất tốt. Người đưa tin tốt. Số mầm tốt: tất cả.' }
     ] },
     { id: 'am_seeds_b', a: 'gideon', b: 'rosa', poi: 'green_bench', hour: [18, 20.5],
       requires: { quest: { id: 'seeds_of_spring', state: 'done_b' } }, lines: [
-      { sp: 'gideon', text: 'Rosa\u2019s show bed came up bright as a market stall.' },
-      { sp: 'rosa', text: 'Your seeds, Gideon. I only gave them a better view.' },
-      { sp: 'gideon', text: 'Hm. The view argues back. Keep the bed.' }
+      { sp: 'gideon', text: 'Luống dự thi của Rosa mọc sáng như quầy chợ.' },
+      { sp: 'rosa', text: 'Hạt của ông đấy, Gideon. Tôi chỉ cho chúng một góc nhìn đẹp hơn.' },
+      { sp: 'gideon', text: 'Hm. Góc nhìn cãi lại. Giữ luống đi.' }
     ] },
     { id: 'am_lamp', a: 'finn', b: 'marlow', poi: 'lighthouse_base', hour: [18, 24],
       requires: { flags: ['marlow_confession'] }, lines: [
-      { sp: 'finn', text: 'Grandpa. When it lights again \u2014 can I count the flashes?' },
-      { sp: 'marlow', text: 'Aye. We will count them together, every one.' },
-      { sp: 'finn', text: 'Even the one that lands on the hills? ESPECIALLY that one.' }
+      { sp: 'finn', text: 'Ông nội ơi. Khi nó sáng lại \u2014 em được đếm các nhịp chớp không?' },
+      { sp: 'marlow', text: 'Được chứ. Ta sẽ đếm cùng nhau, từng nhịp một.' },
+      { sp: 'finn', text: 'Kể cả nhịp rơi trên đồi? NHẤT LÀ NHỊP ĐÓ.' }
     ] }
   ];
 
