@@ -90,7 +90,10 @@ window.WGame = (function () {
     var closeBtn = document.getElementById('arcade-close');
     if (closeBtn) closeBtn.addEventListener('click', closeArcade);
     window.addEventListener('keydown', function (e) {
-      if (state === 'ARCADE' && e.code === 'Escape') closeArcade();
+      if (state === 'ARCADE' && e.code === 'Escape') {
+        WInput.consume('pause');      // the same Esc must not reopen pause a frame later
+        closeArcade();
+      }
     });
 
     document.addEventListener('visibilitychange', function () {
