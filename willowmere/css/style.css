@@ -29,3 +29,60 @@ body {
   image-rendering: -moz-crisp-edges;
   image-rendering: crisp-edges;
 }
+
+/* ---- The old cabinet (Neon Swarm minigame overlay) ------------------------ */
+#arcade-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 4, 12, 0.88);
+}
+#arcade-overlay[hidden] { display: none; }
+
+#arcade-bezel {
+  width: min(96vw, 1280px);
+  height: min(92vh, 800px);
+  display: flex;
+  flex-direction: column;
+  background: #0a0a18;
+  border: 2px solid rgba(53, 230, 255, 0.45);
+  border-radius: 10px;
+  box-shadow: 0 0 34px rgba(53, 230, 255, 0.22), 0 0 120px rgba(0, 0, 0, 0.8);
+  overflow: hidden;
+}
+
+#arcade-chrome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: linear-gradient(#141428, #0c0c1e);
+  border-bottom: 1px solid rgba(53, 230, 255, 0.3);
+  color: #35e6ff;
+  font: 700 11px/1.6 "Courier New", monospace;
+  letter-spacing: 2px;
+}
+
+#arcade-close {
+  background: rgba(255, 45, 149, 0.12);
+  color: #ff5fa8;
+  border: 1px solid rgba(255, 45, 149, 0.55);
+  border-radius: 4px;
+  font: 700 11px/1.4 "Courier New", monospace;
+  letter-spacing: 1px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+#arcade-close:hover { background: rgba(255, 45, 149, 0.3); color: #ffd7ea; }
+
+#arcade-frame {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: #05050e;
+  /* Neon Swarm hides the OS cursor and draws its own crosshair */
+  cursor: none;
+}

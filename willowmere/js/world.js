@@ -2,11 +2,14 @@
    Deterministic 128x96-tile world (4096x3072 px, tile 32).
    - build(): seeded generation — biomes, lake ellipse + sea, trails, village
      green + 8 buildings, pier, props, collision grid, POI table, 5 vistas,
-     interactables, torches.
+     interactables, torches; also the per-tile variant table and the static
+     draw lists (water-edge tiles, wet tiles, trees) used by drawOver.
    - Queries: biomeAt / solidAt / waterAt / weatherRoll.
-   - Draw: drawBack (sky + 2 parallax hill silhouettes + culled tiles +
-     animated water + props), drawOver (canopy + cloud shadows + glints),
-     drawLights (night glows + lighthouse beam when WStory.lampLit).
+   - Draw: drawBack (sky + 2 parallax hill silhouettes + a blitted static-
+     ground cache with animated water on top + props + story scenery),
+     drawOver (canopy + cloud shadows + glints from the build-time lists),
+     drawLights (pre-baked night glow sprites + lighthouse beam when
+     WStory.lampLit).
    - hourTint(hour): keyframe colour-grade layers (§2 of DESIGN.md).
    - Atlas art is used when WAssets.has(key); otherwise the same shapes are
      drawn as vector art in the DESIGN palette. No getImageData, no fetch. */
@@ -81,6 +84,7 @@ window.WWorld = (function () {
 
   /* ---- module state ---- */
   var biome, water, edge, trail, path, pier, solid, blocked;
+  var tvar = null;        // per-tile hash variant (0..255), precomputed at build
   var props = [];
   var propGrid = null;
   var buildings = [];
@@ -90,6 +94,21 @@ window.WWorld = (function () {
   var interactables = [];
   var built = false;
   var frame = 0;
+
+  /* static draw lists (§13 perf): water-edge tiles, wet path/trail tiles and
+     trees are all immutable after build(), so drawOver stops re-scanning the
+     viewport grid every frame */
+  var edgeList = null;    // Int32Array [tx,ty,...]
+  var wetList = null;     // Int32Array [tx,ty,...]
+  var treeList = [];      // indices into props (willows + pines)
+
+  /* static-ground cache: biome/path/trail/pier tiles never change after
+     build(), so they render once into an offscreen canvas and blit in one
+     drawImage; only water (and foam/highlights on it) draws per frame */
+  var gCache = null;
+  var gcOx = 0, gcOy = 0, gcW = 0, gcH = 0, gcAtlas = null;
+  var GC_MARGIN = 4;      // tiles of slack around the viewport
+  var GC_MAX_PX = 4.0e6;  // memory gate (~16 MB); larger views draw directly
 
   var time = 0, lastNow = 0;   // internal visual clock (water, clouds, sway)
   var ffTimer = 0, leafTimer = 0, smokeT = 0;
@@ -354,6 +373,15 @@ window.WWorld = (function () {
     blip('splash');
   }
 
+  /* The old cabinet: hands off to the Neon Swarm minigame overlay
+     (main.js). Someone dragged it out of the lighthouse basement years
+     ago; its screen still hums with a light that is not the lamp's. */
+  function arcadeUse(game) {
+    if (game && typeof game.openArcade === 'function') game.openArcade();
+    else if (window.WGame && typeof WGame.openArcade === 'function') WGame.openArcade();
+    else toast('The cabinet flickers, then thinks better of it.');
+  }
+
   function makeInteractable(id, tx, ty, label, onUse, requires) {
     var it = {
       id: id,
@@ -376,6 +404,11 @@ window.WWorld = (function () {
     pier = new Uint8Array(W * H);
     solid = new Uint8Array(W * H);
     blocked = new Uint8Array(W * H);
+    tvar = new Uint8Array(W * H);
+    edgeList = null;
+    wetList = null;
+    treeList.length = 0;
+    gCache = null;
     /* Clear in place: api exposes these by reference, so rebuild (New Game)
        must not swap the objects out from under consumers. */
     props.length = 0;
@@ -390,13 +423,14 @@ window.WWorld = (function () {
     var rng = WU.seed(MAP_SEED);
     var tx, ty, i;
 
-    /* 1. biome field + water */
+    /* 1. biome field + water (+ precomputed per-tile variants) */
     for (ty = 0; ty < H; ty++) {
       for (tx = 0; tx < W; tx++) {
         i = idx(tx, ty);
         var b = baseBiome(tx, ty);
         biome[i] = b;
         water[i] = (b === B_LAKE || b === B_SEA) ? 1 : 0;
+        tvar[i] = (WU.hash2(tx, ty) * 256) | 0;
       }
     }
 
@@ -678,6 +712,8 @@ window.WWorld = (function () {
     }
     interactables.push(makeInteractable('stone_circle', 14, 18, 'Touch the old stone', stoneCircleUse));
     interactables.push(makeInteractable('pier_end', 75, 44, 'Watch the lake', pierEndUse));
+    interactables.push(makeInteractable('arcade_cabinet', 31, 57, 'Play the old cabinet', arcadeUse));
+    solid[idx(31, 57)] = 1;                       // the cabinet blocks its tile
 
     /* 14. torches (night glow sources) */
     for (l = 0; l < lampTiles.length; l++) {
@@ -686,6 +722,32 @@ window.WWorld = (function () {
     torches.push({ x: 28 * TILE + 16, y: 49 * TILE + 6 });  // bakery lantern
     torches.push({ x: 33 * TILE + 16, y: 32 * TILE + 6 });  // greenhouse lantern
     torches.push({ x: 30 * TILE + 16, y: 79 * TILE + 6 });  // Junie's tent lantern
+
+    /* 15. static draw lists — edge-water tiles, wet path/trail tiles, trees
+       (everything here is immutable after build; drawOver iterates these
+       short lists instead of rescanning the whole viewport) */
+    var eCount = 0, wCount = 0, pi;
+    for (i = 0; i < W * H; i++) {
+      if (edge[i]) eCount++;
+      if (trail[i] || path[i]) wCount++;
+    }
+    edgeList = new Int32Array(eCount * 2);
+    wetList = new Int32Array(wCount * 2);
+    eCount = 0; wCount = 0;
+    for (ty = 0; ty < H; ty++) {
+      for (tx = 0; tx < W; tx++) {
+        i = idx(tx, ty);
+        if (edge[i]) { edgeList[eCount++] = tx; edgeList[eCount++] = ty; }
+        if (trail[i] || path[i]) { wetList[wCount++] = tx; wetList[wCount++] = ty; }
+      }
+    }
+    treeList.length = 0;
+    for (pi = 0; pi < props.length; pi++) {
+      var kind = props[pi].kind;
+      if (kind === 'willow_big' || kind === 'willow_small' || kind === 'pine') {
+        treeList.push(pi);
+      }
+    }
 
     built = true;
   }
@@ -1001,20 +1063,14 @@ window.WWorld = (function () {
       ctx.globalAlpha = a * (0.45 + 0.4 * Math.sin(time * 1.6 + st.ph));
       ctx.fillRect(sx, st.y * vh, st.s, st.s);
     }
-    /* moon with a soft halo */
+    /* moon with a soft halo (pre-baked sprite, alpha by darkness) */
     var mx = vw * 0.76 - offX * 0.05, my = vh * 0.13 + offY * 0.05;
-    var mg = ctx.createRadialGradient(mx, my, 2, mx, my, 44);
-    mg.addColorStop(0, 'rgba(242,246,255,' + (0.9 * a).toFixed(3) + ')');
-    mg.addColorStop(0.22, 'rgba(236,241,255,' + (0.55 * a).toFixed(3) + ')');
-    mg.addColorStop(1, 'rgba(228,236,255,0)');
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = mg;
-    ctx.fillRect(mx - 44, my - 44, 88, 88);
+    glowSpriteAt(ctx, mx, my, 44, ensureGlowSprites('moon'), a);
   }
 
-  function drawWaterTile(ctx, tx, ty, x, y, atlas, isSea) {
+  function drawWaterTile(ctx, tx, ty, x, y, atlas, isSea, hsIn) {
+    var hs = (hsIn === undefined) ? WU.hash2(tx, ty) : hsIn / 255;
     if (atlas) {
-      var hs = WU.hash2(tx, ty);
       var f = (Math.floor((Math.sin(time * 2) + 1) * 1.999) + ((hs * 4) | 0)) % 4;
       WAssets.sheet(ctx, 'tiles', (TC.water0 + f) * TILE, TC.waterRow * TILE, TILE, TILE, x, y, TILE, TILE);
       if (isSea) {
@@ -1027,7 +1083,7 @@ window.WWorld = (function () {
     }
     /* moving highlight (sine clock) */
     var ph = (Math.sin(time * 1.7 + (tx * 0.6 + ty * 0.9) * 1.3) + 1) / 2;
-    var hx = ((WU.hash2(tx, ty) * 23 + time * 8) % 26) | 0;
+    var hx = ((hs * 23 + time * 8) % 26) | 0;
     ctx.fillStyle = PAL.waterHi;
     ctx.fillRect(x + hx, y + 4 + ((ph * 22) | 0) % 24, 9, 2);
     /* foam where water meets land */
@@ -1063,10 +1119,11 @@ window.WWorld = (function () {
     }
   }
 
-  function drawGroundTile(ctx, tx, ty, x, y, atlas) {
+  function drawGroundTile(ctx, tx, ty, x, y, atlas, hsIn) {
     var i = idx(tx, ty);
     var b = biome[i];
-    var hs = WU.hash2(tx, ty);
+    var hs = (hsIn === undefined) ? WU.hash2(tx, ty) * 256 : hsIn;
+    hs = hs / 255;
     var cell = null;
     var base;
     switch (b) {
@@ -1129,22 +1186,81 @@ window.WWorld = (function () {
     }
   }
 
+  function buildGroundCache(ox, oy, cw, ch, atlas) {
+    if (!gCache || gCache.width !== cw || gCache.height !== ch) {
+      gCache = document.createElement('canvas');
+      gCache.width = cw;
+      gCache.height = ch;
+    }
+    var g = gCache.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    g.clearRect(0, 0, cw, ch);
+    var tx0 = ox / TILE, ty0 = oy / TILE;
+    var tx1 = Math.min(W - 1, ((ox + cw) / TILE) | 0);
+    var ty1 = Math.min(H - 1, ((oy + ch) / TILE) | 0);
+    for (var ty = ty0; ty <= ty1; ty++) {
+      for (var tx = tx0; tx <= tx1; tx++) {
+        var i = idx(tx, ty);
+        var x = tx * TILE - ox, y = ty * TILE - oy;
+        if (water[i]) continue;                 // water stays a live layer
+        if (pier[i]) { drawPierTile(g, x, y, atlas); continue; }
+        drawGroundTile(g, tx, ty, x, y, atlas, tvar[i]);
+        if (path[i]) drawPathOverlay(g, x, y, atlas);
+        else if (trail[i]) drawTrailOverlay(g, x, y, atlas);
+      }
+    }
+    gcOx = ox; gcOy = oy; gcW = cw; gcH = ch; gcAtlas = atlas;
+  }
+
   function drawTiles(ctx, cam, vw, vh) {
     var atlas = !!(window.WAssets && WAssets.has('tiles'));
     var tx0 = clamp((cam.x / TILE) | 0, 0, W - 1);
     var ty0 = clamp((cam.y / TILE) | 0, 0, H - 1);
     var tx1 = clamp(((cam.x + vw) / TILE) | 0, 0, W - 1);
     var ty1 = clamp(((cam.y + vh) / TILE) | 0, 0, H - 1);
+
+    /* Fast path: ground/path/trail/pier live in one offscreen canvas and blit
+       once per frame; only water tiles (animated) draw individually on top.
+       The cache is tile-aligned and carries a few tiles of slack, so it
+       re-renders only every few tile crossings, not every frame. Very large
+       viewports (vista zoom-out, 4K) skip the cache on a memory gate. */
+    var wantW = vw + GC_MARGIN * 2 * TILE;
+    var wantH = vh + GC_MARGIN * 2 * TILE;
+    if (wantW * wantH <= GC_MAX_PX) {
+      var ox = clamp(((cam.x / TILE) | 0) - GC_MARGIN, 0, W - 1) * TILE;
+      var oy = clamp(((cam.y / TILE) | 0) - GC_MARGIN, 0, H - 1) * TILE;
+      var cw = Math.min(wantW, WPX - ox);
+      var ch = Math.min(wantH, HPX - oy);
+      if (!gCache || gcW !== cw || gcH !== ch || gcOx !== ox || gcOy !== oy ||
+          gcAtlas !== atlas) {
+        try { buildGroundCache(ox, oy, cw, ch, atlas); }
+        catch (e) { gCache = null; }             // fall back to the direct path
+      }
+      if (gCache) {
+        ctx.drawImage(gCache, gcOx, gcOy);
+        for (var wy = ty0; wy <= ty1; wy++) {
+          for (var wx = tx0; wx <= tx1; wx++) {
+            var wi = idx(wx, wy);
+            if (water[wi]) {
+              drawWaterTile(ctx, wx, wy, wx * TILE, wy * TILE, atlas,
+                biome[wi] === B_SEA, tvar[wi]);
+            }
+          }
+        }
+        return;
+      }
+    }
+
     for (var ty = ty0; ty <= ty1; ty++) {
       for (var tx = tx0; tx <= tx1; tx++) {
         var i = idx(tx, ty);
         var x = tx * TILE, y = ty * TILE;
         if (pier[i]) { drawPierTile(ctx, x, y, atlas); continue; }
         if (water[i]) {
-          drawWaterTile(ctx, tx, ty, x, y, atlas, biome[i] === B_SEA);
+          drawWaterTile(ctx, tx, ty, x, y, atlas, biome[i] === B_SEA, tvar[i]);
           continue;
         }
-        drawGroundTile(ctx, tx, ty, x, y, atlas);
+        drawGroundTile(ctx, tx, ty, x, y, atlas, tvar[i]);
         if (path[i]) drawPathOverlay(ctx, x, y, atlas);
         else if (trail[i]) drawTrailOverlay(ctx, x, y, atlas);
       }
@@ -1461,7 +1577,7 @@ window.WWorld = (function () {
     for (var i = 0; i < interactables.length; i++) {
       var it = interactables[i];
       if (it._taken) continue;
-      if (it.id !== 'moonbell' && it.id !== 'lost_lamb') continue;
+      if (it.id !== 'moonbell' && it.id !== 'lost_lamb' && it.id !== 'arcade_cabinet') continue;
       if (it.x > cam.x + vw + 48 || it.x + it.w < cam.x - 48 ||
           it.y > cam.y + vh + 48 || it.y + it.h < cam.y - 48) continue;
       if (!checkReq(it.requires)) continue;
@@ -1469,11 +1585,7 @@ window.WWorld = (function () {
       if (it.id === 'moonbell') {
         /* pale bloom on a stem with a soft night glow */
         var pulse = 0.75 + 0.25 * Math.sin(time * 2.1);
-        var g = ctx.createRadialGradient(cx, base - 20, 2, cx, base - 20, 26);
-        g.addColorStop(0, 'rgba(190,235,255,' + (0.4 * pulse).toFixed(3) + ')');
-        g.addColorStop(1, 'rgba(190,235,255,0)');
-        ctx.fillStyle = g;
-        ctx.fillRect(cx - 26, base - 46, 52, 52);
+        glowSpriteAt(ctx, cx, base - 20, 26, ensureGlowSprites('cool'), 0.42 * pulse);
         ctx.strokeStyle = '#4f7a4a';
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -1489,6 +1601,37 @@ window.WWorld = (function () {
         }
         ctx.fillStyle = '#ffe9a8';
         ctx.beginPath(); ctx.arc(cx, base - 20, 2.4, 0, WU.TAU); ctx.fill();
+      } else if (it.id === 'arcade_cabinet') {
+        /* squat cabinet, ~24 px wide, 34 px tall; the screen flickers with a
+           light that is not the lamp's — a hint of what lives inside */
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.beginPath(); ctx.ellipse(cx, base + 1, 14, 3.5, 0, 0, WU.TAU); ctx.fill();
+        ctx.fillStyle = '#141422';                                  // body
+        ctx.fillRect(cx - 12, base - 34, 24, 34);
+        ctx.strokeStyle = '#2b2b45';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(cx - 11.5, base - 33.5, 23, 33);
+        ctx.fillStyle = '#1e1e33';                                  // marquee
+        ctx.fillRect(cx - 11, base - 34, 22, 6);
+        var mk = 0.5 + 0.5 * Math.sin(time * 3.1);
+        ctx.fillStyle = 'rgba(53,230,255,' + (0.25 + 0.4 * mk) + ')';
+        ctx.fillRect(cx - 9, base - 32.5, 18, 3);
+        ctx.fillStyle = '#05050e';                                  // screen
+        ctx.fillRect(cx - 9, base - 26, 18, 14);
+        var sc = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(time * 7.3 + 1.7));
+        ctx.fillStyle = 'rgba(53,230,255,' + (0.55 * sc) + ')';
+        ctx.fillRect(cx - 7, base - 24, 14, 10);
+        ctx.fillStyle = 'rgba(255,45,149,' + (0.5 * sc) + ')';       // pixel sprite
+        ctx.fillRect(cx - 3 + Math.sin(time * 2.2) * 3, base - 22, 5, 5);
+        ctx.fillStyle = '#2b2b45';                                  // controls
+        ctx.fillRect(cx - 9, base - 10, 18, 4);
+        ctx.fillStyle = '#ff5fa8';
+        ctx.beginPath(); ctx.arc(cx - 4, base - 8, 1.6, 0, WU.TAU); ctx.fill();
+        ctx.fillStyle = '#35e6ff';
+        ctx.beginPath(); ctx.arc(cx + 4, base - 8, 1.6, 0, WU.TAU); ctx.fill();
+        if (glowSpriteAt) {
+          glowSpriteAt(ctx, cx, base - 20, 22, ensureGlowSprites('cool'), 0.18 + 0.12 * sc);
+        }
       } else {
         /* the lamb: small white body + head, gentle bob */
         var bob = Math.sin(time * 2.2) * 1.2;
@@ -1502,6 +1645,155 @@ window.WWorld = (function () {
         ctx.fillRect(cx + 6, ly - 8, 2, 2);
         ctx.fillRect(cx - 6, ly + 3, 2, 4);
         ctx.fillRect(cx + 1, ly + 3, 2, 4);
+      }
+    }
+  }
+
+  /* §3.2 outcome scenery: quest results leave visible marks on the world —
+     the greenhouse bloom, Rosa's erupting show bed, the replanted moonbell
+     at the tower base, the shop-roof kite, Bramble's forest gate and old
+     Siltjaw's fin by the pier (junie_leaves moves her schedule in npcs.js).
+     All draw-only, each gated by one flag read and viewport-checked. */
+  function storyFlag(k) {
+    var S = window.WStory;
+    return !!(S && typeof S.flag === 'function' && S.flag(k));
+  }
+
+  function inView(x, y, cam, vw, vh, m) {
+    return x > cam.x - m && x < cam.x + vw + m &&
+           y > cam.y - m && y < cam.y + vh + m;
+  }
+
+  function flowerTuft(ctx, x, y, c) {
+    ctx.fillStyle = '#3f6d3a';
+    ctx.fillRect(x - 1, y - 5, 2, 5);
+    ctx.fillStyle = c;
+    ctx.fillRect(x - 2, y - 9, 4, 4);
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillRect(x - 1, y - 8, 1.5, 1.5);
+  }
+
+  function drawStoryProps(ctx, cam, vw, vh) {
+    var T = TILE;
+    var cols = ['#f2b6c6', '#f7e08c', '#f4f4f4', '#c9a7eb'];
+    var i, x, y;
+
+    /* honey_to_gideon — the greenhouse blooms out of season */
+    if (storyFlag('honey_to_gideon')) {
+      for (i = 0; i < 10; i++) {
+        x = (31 + (i % 5)) * T + 6 + ((i * 13) % 18);
+        y = (33 + ((i / 5) | 0)) * T + 6 + ((i * 7) % 12);
+        if (inView(x, y, cam, vw, vh, 32)) flowerTuft(ctx, x, y, cols[i % 4]);
+      }
+    }
+
+    /* seeds_gifted — Rosa's show bed erupts in colour */
+    if (storyFlag('seeds_gifted')) {
+      for (i = 0; i < 10; i++) {
+        x = (50 + (i % 5)) * T + 4 + ((i * 11) % 20);
+        y = (57 + ((i / 5) | 0)) * T + 4 + ((i * 5) % 12);
+        if (inView(x, y, cam, vw, vh, 32)) flowerTuft(ctx, x, y, cols[(i + 2) % 4]);
+      }
+    }
+
+    /* show_won — the moonbell replanted where a keeper can see it glows */
+    if (storyFlag('show_won')) {
+      var mbx = 71 * T + 16, mby = 86 * T;      // beside the tower door
+      if (inView(mbx, mby, cam, vw, vh, 48)) {
+        var e2 = api.env || {};
+        var dark = darkness(e2.hour !== undefined ? e2.hour : 12);
+        var pulse = 0.75 + 0.25 * Math.sin(time * 2.1);
+        glowSpriteAt(ctx, mbx, mby - 20, 26, ensureGlowSprites('cool'),
+          (0.18 + 0.4 * dark) * pulse);
+        ctx.strokeStyle = '#4f7a4a';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(mbx, mby);
+        ctx.quadraticCurveTo(mbx + 3, mby - 10, mbx, mby - 18);
+        ctx.stroke();
+        ctx.fillStyle = '#dff3ff';
+        for (var p2 = 0; p2 < 5; p2++) {
+          var a3 = p2 / 5 * WU.TAU + time * 0.4;
+          ctx.beginPath();
+          ctx.ellipse(mbx + Math.cos(a3) * 5, mby - 20 + Math.sin(a3) * 5,
+            4, 2.4, a3, 0, WU.TAU);
+          ctx.fill();
+        }
+        ctx.fillStyle = '#ffe9a8';
+        ctx.beginPath(); ctx.arc(mbx, mby - 20, 2.4, 0, WU.TAU); ctx.fill();
+      }
+    }
+
+    /* parcel_kite — the kite flies from the shop roof, "a flag for no nation" */
+    if (storyFlag('parcel_kite')) {
+      var ax = 1312, ay = 46 * T - 6;           // shop roof apex
+      var kx = ax + Math.sin(time * 0.8) * 10;
+      var ky = ay - 64 + Math.cos(time * 0.6) * 8;
+      if (inView(kx, ky, cam, vw, vh, 80)) {
+        ctx.strokeStyle = 'rgba(90,70,50,0.7)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.quadraticCurveTo((ax + kx) / 2 + 6, (ay + ky) / 2, kx, ky);
+        ctx.stroke();
+        ctx.fillStyle = '#e2574c';
+        ctx.beginPath();
+        ctx.moveTo(kx, ky - 12);
+        ctx.lineTo(kx + 8, ky);
+        ctx.lineTo(kx, ky + 16);
+        ctx.lineTo(kx - 8, ky);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#f7e08c';
+        ctx.beginPath();
+        ctx.moveTo(kx, ky - 12);
+        ctx.lineTo(kx + 8, ky);
+        ctx.lineTo(kx, ky);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#7ec8e0';
+        ctx.fillRect(kx - 2 + Math.sin(time * 2.2) * 3, ky + 22, 4, 3);
+        ctx.fillRect(kx - 4 + Math.sin(time * 2.6 + 1) * 5, ky + 30, 4, 3);
+      }
+    }
+
+    /* lamb_led — the new gate at the forest edge opens easily */
+    if (storyFlag('lamb_led')) {
+      var gx = 30 * T, gy = 30 * T;             // north trail x the forest line
+      if (inView(gx, gy, cam, vw, vh, 64)) {
+        ctx.fillStyle = PAL.wood;
+        ctx.fillRect(gx - 3, gy - 26, 5, 26);
+        ctx.fillRect(gx + TILE - 2, gy - 26, 5, 26);
+        ctx.fillStyle = PAL.woodDark;
+        ctx.fillRect(gx - 5, gy - 26, TILE + 10, 4);
+        ctx.fillRect(gx - 3, gy - 16, TILE + 6, 3);
+        ctx.fillRect(gx - 3, gy - 7, TILE + 6, 3);
+      }
+    }
+
+    /* siltjaw_freed — every so often the big fin tips the water by the pier */
+    if (storyFlag('siltjaw_freed')) {
+      var cyc = time % 18;
+      if (cyc < 5) {
+        var fh = Math.sin(cyc / 5 * Math.PI);
+        if (fh > 0.08) {
+          var fix = 72.5 * T, fiy = 46.5 * T + 6;
+          if (inView(fix, fiy, cam, vw, vh, 48)) {
+            var hh = fh * 10;
+            ctx.fillStyle = '#43575e';
+            ctx.beginPath();
+            ctx.moveTo(fix - 9, fiy);
+            ctx.quadraticCurveTo(fix - 1, fiy - hh * 1.6, fix + 8, fiy - hh * 0.4);
+            ctx.quadraticCurveTo(fix, fiy - hh * 0.2, fix - 9, fiy);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(235,248,255,0.5)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.ellipse(fix, fiy + 1, 14 * fh, 3 * fh, 0, 0, WU.TAU);
+            ctx.stroke();
+          }
+        }
       }
     }
   }
@@ -1628,6 +1920,7 @@ window.WWorld = (function () {
     drawTiles(ctx, cam, vw, vh);
     drawProps(ctx, cam, vw, vh);
     drawStoryInteractables(ctx, cam, vw, vh);
+    drawStoryProps(ctx, cam, vw, vh);
     ctx.restore();
     ambient(dt, cam, vw, vh);
   }
@@ -1645,27 +1938,16 @@ window.WWorld = (function () {
     ctx.save();
     ctx.translate(-Math.round(cam.x), -Math.round(cam.y));
 
-    /* canopy shadows under trees (own frame marker — drawProps owns _f) */
-    var tx0 = clamp((cam.x / TILE) | 0, 0, W - 1);
-    var ty0 = clamp((cam.y / TILE) | 0, 0, H - 1);
-    var tx1 = clamp(((cam.x + vw) / TILE) | 0, 0, W - 1);
-    var ty1 = clamp(((cam.y + vh) / TILE) | 0, 0, H - 1);
+    /* canopy shadows under trees — the tree list is fixed at build() */
     ctx.fillStyle = 'rgba(10,20,15,0.13)';
-    for (var ty = ty0; ty <= ty1; ty++) {
-      for (var tx = tx0; tx <= tx1; tx++) {
-        var cell = propGrid[idx(tx, ty)];
-        if (!cell) continue;
-        for (var k = 0; k < cell.length; k++) {
-          var p = props[cell[k]];
-          if (p.kind !== 'willow_big' && p.kind !== 'willow_small' && p.kind !== 'pine') continue;
-          if (p._s === frame) continue; // shadow already drawn this frame
-          p._s = frame;
-          var big = p.kind === 'willow_big';
-          ctx.beginPath();
-          ctx.ellipse(p.x, p.y + 2, big ? 30 : 20, big ? 11 : 8, 0, 0, WU.TAU);
-          ctx.fill();
-        }
-      }
+    for (var ti = 0; ti < treeList.length; ti++) {
+      var p = props[treeList[ti]];
+      if (p.x < cam.x - 80 || p.x > cam.x + vw + 80 ||
+          p.y < cam.y - 40 || p.y > cam.y + vh + 40) continue;
+      var big = p.kind === 'willow_big';
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y + 2, big ? 30 : 20, big ? 11 : 8, 0, 0, WU.TAU);
+      ctx.fill();
     }
 
     /* 3 drifting cloud shadows, alpha 0.08 */
@@ -1679,31 +1961,29 @@ window.WWorld = (function () {
       ctx.fill();
     }
 
-    /* water rim glints on edge tiles */
+    /* water rim glints on the build-time edge list (no viewport grid scan) */
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    for (ty = ty0; ty <= ty1; ty++) {
-      for (tx = tx0; tx <= tx1; tx++) {
-        var i = idx(tx, ty);
-        if (!water[i] || !edge[i]) continue;
-        var gl = 0.10 + 0.14 * Math.sin(time * 2.5 + WU.hash2(tx, ty) * 6.28);
-        if (gl <= 0.02) continue;
-        ctx.globalAlpha = gl;
-        if (inMap(tx, ty - 1) && !water[idx(tx, ty - 1)]) ctx.fillRect(tx * TILE + 6, ty * TILE + 2, 9, 2);
-        if (inMap(tx, ty + 1) && !water[idx(tx, ty + 1)]) ctx.fillRect(tx * TILE + 14, ty * TILE + TILE - 4, 9, 2);
-      }
+    for (var ei = 0; ei < edgeList.length; ei += 2) {
+      var tx = edgeList[ei], ty = edgeList[ei + 1];
+      if (tx * TILE < cam.x - TILE || tx * TILE > cam.x + vw ||
+          ty * TILE < cam.y - TILE || ty * TILE > cam.y + vh) continue;
+      var gl = 0.10 + 0.14 * Math.sin(time * 2.5 + tvar[idx(tx, ty)] * 0.0246);
+      if (gl <= 0.02) continue;
+      ctx.globalAlpha = gl;
+      if (inMap(tx, ty - 1) && !water[idx(tx, ty - 1)]) ctx.fillRect(tx * TILE + 6, ty * TILE + 2, 9, 2);
+      if (inMap(tx, ty + 1) && !water[idx(tx, ty + 1)]) ctx.fillRect(tx * TILE + 14, ty * TILE + TILE - 4, 9, 2);
     }
     ctx.globalAlpha = 1;
 
-    /* wet glints on sand paths while raining */
+    /* wet glints on sand paths while raining (same build-time list) */
     if (e.weather === 'rain') {
       ctx.fillStyle = 'rgba(255,255,255,0.8)';
-      for (ty = ty0; ty <= ty1; ty++) {
-        for (tx = tx0; tx <= tx1; tx++) {
-          var j = idx(tx, ty);
-          if (!trail[j] && !path[j]) continue;
-          ctx.globalAlpha = 0.06 + 0.08 * Math.sin(time * 3 + WU.hash2(tx, ty) * 9);
-          ctx.fillRect(tx * TILE + 8, ty * TILE + 10, 10, 2);
-        }
+      for (var wi = 0; wi < wetList.length; wi += 2) {
+        var wx = wetList[wi], wy = wetList[wi + 1];
+        if (wx * TILE < cam.x - TILE || wx * TILE > cam.x + vw ||
+            wy * TILE < cam.y - TILE || wy * TILE > cam.y + vh) continue;
+        ctx.globalAlpha = 0.06 + 0.08 * Math.sin(time * 3 + tvar[idx(wx, wy)] * 0.0353);
+        ctx.fillRect(wx * TILE + 8, wy * TILE + 10, 10, 2);
       }
       ctx.globalAlpha = 1;
     }
@@ -1713,12 +1993,61 @@ window.WWorld = (function () {
 
   /* ============================== DRAW: LIGHTS ============================== */
 
-  function glow(ctx, x, y, r, rgb, alpha) {
-    var g = ctx.createRadialGradient(x, y, 4, x, y, r);
-    g.addColorStop(0, WU.rgba(rgb, alpha));
-    g.addColorStop(1, WU.rgba(rgb, 0));
-    ctx.fillStyle = g;
-    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  /* Radial glows are pre-baked sprites (created once, blitted with
+     globalAlpha) — createRadialGradient per torch per frame was the most
+     expensive op on night frames. */
+  var glowSprites = null;
+  function ensureGlowSprites(which) {
+    if (!glowSprites) {
+      function radial(size, r, g, b) {
+        var c = document.createElement('canvas');
+        c.width = c.height = size;
+        var g2 = c.getContext('2d');
+        var grad = g2.createRadialGradient(size / 2, size / 2, 1, size / 2, size / 2, size / 2);
+        grad.addColorStop(0, 'rgba(' + r + ',' + g + ',' + b + ',0.9)');
+        grad.addColorStop(0.4, 'rgba(' + r + ',' + g + ',' + b + ',0.4)');
+        grad.addColorStop(1, 'rgba(' + r + ',' + g + ',' + b + ',0)');
+        g2.fillStyle = grad;
+        g2.fillRect(0, 0, size, size);
+        return c;
+      }
+      glowSprites = {
+        warm: radial(128, 255, 205, 130),   // torch / lantern light
+        cool: radial(128, 190, 235, 255),   // moonbell bloom
+        moon: radial(128, 236, 241, 255)    // lunar halo
+      };
+    }
+    return glowSprites[which];
+  }
+
+  function glowSpriteAt(ctx, x, y, r, sp, alpha) {
+    if (!sp) return;
+    ctx.globalAlpha = clamp(alpha, 0, 1);
+    ctx.drawImage(sp, x - r, y - r, r * 2, r * 2);
+    ctx.globalAlpha = 1;
+  }
+
+  /* Lighthouse beam: a pre-baked wedge sprite (apex at 0, half-width), spun
+     with rotate() — no gradients or arc fills per frame. */
+  var beamSprite = null;
+  function ensureBeam() {
+    if (beamSprite) return beamSprite;
+    var c = document.createElement('canvas');
+    c.width = 256;
+    c.height = 56;                       // apex (0,28), opening toward +x
+    var g2 = c.getContext('2d');
+    var grad = g2.createRadialGradient(0, 28, 10, 0, 28, 256);
+    grad.addColorStop(0, 'rgba(255,244,200,1)');
+    grad.addColorStop(1, 'rgba(255,244,200,0)');
+    g2.fillStyle = grad;
+    g2.beginPath();
+    g2.moveTo(0, 28);
+    g2.lineTo(256, 0);
+    g2.lineTo(256, 56);
+    g2.closePath();
+    g2.fill();
+    beamSprite = c;
+    return c;
   }
 
   function lampLit() {
@@ -1747,12 +2076,12 @@ window.WWorld = (function () {
         var t = torches[i];
         if (t.x < cam.x - 220 || t.x > cam.x + vw + 220 || t.y < cam.y - 220 || t.y > cam.y + vh + 220) continue;
         var flick = 0.9 + 0.1 * Math.sin(time * 6 + i * 2.1);
-        glow(ctx, t.x, t.y, 200, [255, 205, 130], 0.30 * d * flick);
+        glowSpriteAt(ctx, t.x, t.y, 200, ensureGlowSprites('warm'), 0.30 * d * flick);
       }
       /* player lantern: r140 */
       var pl = e.player;
       if (pl && typeof pl.x === 'number') {
-        glow(ctx, pl.x, pl.y, 140, [255, 217, 160], 0.28 * d);
+        glowSpriteAt(ctx, pl.x, pl.y, 140, ensureGlowSprites('warm'), 0.28 * d);
       }
     }
 
@@ -1760,17 +2089,16 @@ window.WWorld = (function () {
     if (lit) {
       var lx = 69.5 * TILE, ly = 79 * TILE + 16;
       var ang = time * 0.5;
+      var bs = ensureBeam();
+      var blen = 760, bh = 56 * (blen / 256);
       for (var k = 0; k < 2; k++) {
         var a2 = ang + k * Math.PI;
-        var g2 = ctx.createRadialGradient(lx, ly, 10, lx, ly, 760);
-        g2.addColorStop(0, 'rgba(255,244,200,' + (0.30 * Math.max(0.25, d)) + ')');
-        g2.addColorStop(1, 'rgba(255,244,200,0)');
-        ctx.fillStyle = g2;
-        ctx.beginPath();
-        ctx.moveTo(lx, ly);
-        ctx.arc(lx, ly, 760, a2 - 0.17, a2 + 0.17);
-        ctx.closePath();
-        ctx.fill();
+        ctx.save();
+        ctx.translate(lx, ly);
+        ctx.rotate(a2);
+        ctx.globalAlpha = 0.30 * Math.max(0.25, d);
+        ctx.drawImage(bs, 0, -bh / 2, blen, bh);
+        ctx.restore();
       }
     }
 

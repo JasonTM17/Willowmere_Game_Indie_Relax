@@ -5,10 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
   <title>Willowmere</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230b0f14'/%3E%3Cpath d='M8 2 L10 6 L14 7 L11 10 L12 14 L8 12 L4 14 L5 10 L2 7 L6 6 Z' fill='%237fd07f'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <canvas id="game" width="1280" height="720">Your browser does not support the canvas element.</canvas>
+
+  <!-- The old cabinet: Neon Swarm runs inside an iframe so both games keep
+       their own loops, input and storage. Willowmere freezes behind it. -->
+  <div id="arcade-overlay" hidden>
+    <div id="arcade-bezel">
+      <div id="arcade-chrome">
+        <span id="arcade-title">THE OLD CABINET &mdash; LUX-1</span>
+        <button id="arcade-close" type="button">&#10005; LEAVE</button>
+      </div>
+      <iframe id="arcade-frame" title="Neon Swarm arcade cabinet"></iframe>
+    </div>
+  </div>
 
   <!-- Source contract (DESIGN.md §7): classic scripts, exact order, end of
        body. No module scripts, no async/defer. Files not yet written

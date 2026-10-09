@@ -186,6 +186,28 @@ also renders full-length in a small "overheard" panel above the pair.
 | `am_seeds` | Gideon + Rosa | green bench · 18–20 | quest `seeds_of_spring` done_a/b | line differs by outcome |
 | `am_lamp` | Finn + Marlow | lighthouse base · 18–21 | flag `marlow_confession` | grandson & grandfather, quietly |
 
+**Engine schedule notes (implementation, §3.1/§3.3).** The engine walks NPCs
+at real-time 42 px/s, so crossing the map takes ~2–3 game-hours — longer than
+some §3.1 beats. Consequences, all deliberate:
+
+- Commutes are packed into the small hours so a beat is actually *stood at*:
+  Marlow walks to the tide pools 2–5 (beat 5–8 intact) and stays at the
+  lighthouse base to 21:30 so Finn's evening visit (pair `am_lamp`) overlaps;
+  Finn is home from 21:00 rather than 20:00. Junie reaches the Tor ~20:2 and
+  paints the last light; her forest light-shaft beat (15–18) had to give, as
+  the Tor is a full map from the north forest.
+- Pair windows are re-pinned to where the restored beats actually overlap:
+  `am_post` 8.4–9 (mail round ends at the bakery), `am_colors` 16.9–17.6
+  (Rosa's bench ends 16.5 so the pair can meet); `am_lamp` keeps the wide
+  `18–24` window — both villagers stand at the base only ~19.5–21.3 anyway
+  (Marlow 18–21.5, Finn 19.5–21), and the `marlow_confession` flag gates it.
+- `am_tide` (Marlow + Bramble) has no shared geography under faithful §3.1 —
+  his mornings are at the beach tide pools, Bramble's on the pasture — so it
+  is kept as data but does not fire; `am_forecast` lost its dock overlap to
+  Finn's restored green-games beat. Both are documented in `npcs.js`.
+- Hana's §3.1 mail round walks four front doors (east cottage → west cottage
+  → the Warden's cottage → bakery) between 7:00 and 9:00.
+
 ---
 
 ## 4 · Story — "The Dark Lamp of Willowmere"
@@ -275,7 +297,19 @@ Exterior interactables (E within 1.2 tiles, prompt shown): cottage door (Sleep,
 18:00+, §11) · lighthouse door (Climb, when gates pass) · Rosa's attic shed (the
 letter) · wild hives (honeycomb, after Mira mentions it) · hill trail glint
 (seed pouch) · notice board (duplicates quest log) · 5 signs · stone circle ·
-pier end. Interiors do not exist; the "attic letter" is read at the shed door.
+pier end · the old cabinet (arcade, beside the player cottage). Interiors do
+not exist; the "attic letter" is read at the shed door.
+
+**The old cabinet (Neon Swarm minigame):** a squat arcade cabinet at tile
+(31,57), one tile east of the player's cottage door — something Marlow dragged
+out of the lighthouse basement years ago. Its screen flickers cyan with a
+light that is not the lamp's. Using it freezes the village (state `ARCADE`)
+and opens `#arcade-overlay`, an iframe bezel running `../neon-swarm/` with its
+own loop, input and `localStorage` — full isolation, zero shared globals. The
+`✕ LEAVE` chrome button (or `Esc` when the bezel holds focus) calls
+`WGame.closeArcade()`: the frame unloads to `about:blank`, music re-triggers,
+and if the run inside reached the DAWN ending (`GameCodex.data.won`, readable
+same-origin over http) the flag `arcade_dawn_seen` is set with a toast.
 
 Items (registry `{id, name, desc, kind, tags}`): critters ×10, fish ×6, `mote`,
 `food_honeycomb`, `seeds_pouch`, `moonbell`, `lens_cloth`, `wool_cloak`,
@@ -287,7 +321,10 @@ beach 20–2 · grasshopper hills 7–17. Rain halves spawns. Alive cap 40, spaw
 ring 6–14 tiles from the player in matching biome/hour, despawn beyond 20.
 
 **Gifts.** Talk → "(Give a gift…)" choice (visible if inventory non-empty) →
-simple picker listing items with the NPC's reaction preview hidden. Resolution:
+simple picker listing items with the NPC's reaction preview hidden. The choice
+is injected into every NPC-facing node while the pouch holds anything; when it
+is the only choice, E still ends the conversation and the gift is given via
+its number key, a click, or ↑↓ + E. Resolution:
 `WAction.gift(npcId, itemKey)` → hearts per §3, heart particles, result line from
 that NPC's voice. Loved gifts can unlock quests: e.g. giving Gideon a luna moth
 at any time opens `seeds_of_spring` early; giving Junie motes opens a palette
@@ -620,9 +657,12 @@ Continue hidden, no error.
 | Motes alive | ≤ 12 | `WAction.update` |
 | Particles | ≤ 400 total (rain ≤ 300) | `WParticles` pool |
 | Tile draw | viewport only | `WWorld.drawBack` cull rect |
+| Static ground | one offscreen cache, blit per frame; animated water on top; ~4.0 M px² memory gate, bigger views (vista zoom-out, 4K) draw tile-by-tile | `WWorld.drawTiles` |
+| Night glows | pre-baked radial sprites (torch/lantern, moonbell, moon, beam wedge) — no `createRadialGradient` per frame | `WWorld.drawLights` |
 | Dialogue line | ≤ 120 chars; bubble ≤ 60 | data + `WHUD` clamp |
 | Toasts | ≤ 3 | `WHUD.toast` |
 | NPCs | 8 (+3 sheep props) | `WNpcs.DEFS` |
+| NPC pathfinding | ≤ 2 BFS runs per frame; waypoints thinned ×2 | `WNpcs.update` |
 | Audio elements | 3 music (crossfaded) | `WAudio` |
 
 Target 60 fps on integrated graphics; plain `drawImage`/`fillRect`/gradients only, no per-frame allocations in hot loops.
@@ -637,7 +677,7 @@ Each item is a hard requirement, with its owning call site:
 |---|---|
 | Distant-hill parallax | `WWorld.drawBack` — 2 silhouette layers, offset `cam.x*0.35`, `cam.y*0.2` |
 | Animated water | tiles `water_0..3` cycled on a sine clock + pier/sea foam row in `drawBack` |
-| Night light: player + torches | `WWorld.drawLights` — additive radial gradients r140 player / r200 torch & lamp posts; lighthouse beam when `lampLit` |
+| Night light: player + torches | `WWorld.drawLights` — additive pre-baked glow sprites r140 player / r200 torch & lamp posts (flicker = alpha); lighthouse beam wedge sprite when `lampLit` |
 | Fireflies | `firefly` particles, forest & meadow, hour 20–2, sine blink |
 | Falling leaves | `leaf` particles in forest band, wind drift; tree-shake bursts from slingshot |
 | Rain | `setRain` streaks + ripples on water + `music-rain` + sand glints (§2) |

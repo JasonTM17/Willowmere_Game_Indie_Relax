@@ -21,14 +21,20 @@ window.WGame = (function () {
     frozen: false, player: null
   };
   var player = { x: 944, y: 1872, dir: 'down', walkT: 0, moving: false, speed: 84 };
+  var lastStep = -1;         // walk-frame counter at the last emitted footstep
 
   var cam = { x: 0, y: 0 };
   var zoom = 1, zoomTgt = 1;
+  /* smoothed follow focus + look-ahead (polish): the zoom eases, so the pan
+     should too; clamping and the integer translate stay as they were */
+  var camFx = 944, camFy = 1872;
+  var lookX = 0, lookY = 0;
 
   var last = 0, raf = 0;
   var hasSave = false;
   var curMusic = '';
   var audioReadySeen = false;
+  var arcadeOverlay = null;     // the old cabinet: Neon Swarm iframe overlay
 
   var titleSel = 0;
   var pauseSel = 0;
@@ -78,6 +84,15 @@ window.WGame = (function () {
       }
     };
 
+    /* the old cabinet (Neon Swarm overlay): close button + Esc fallback for
+       when the bezel, not the iframe, holds focus */
+    arcadeOverlay = document.getElementById('arcade-overlay');
+    var closeBtn = document.getElementById('arcade-close');
+    if (closeBtn) closeBtn.addEventListener('click', closeArcade);
+    window.addEventListener('keydown', function (e) {
+      if (state === 'ARCADE' && e.code === 'Escape') closeArcade();
+    });
+
     document.addEventListener('visibilitychange', function () {
       if (document.hidden) autoPause();
     });
@@ -88,10 +103,53 @@ window.WGame = (function () {
   }
 
   function autoPause() {
+    if (state === 'ARCADE') return;   // the iframe losing focus is normal play
     if (state === 'PLAY' || state === 'DIALOGUE' || state === 'VISTA') {
       prePause = state === 'PAUSE' ? prePause : state;
       state = 'PAUSE';
       pauseSel = 0;
+    }
+  }
+
+  /* ============================== ARCADE ============================== */
+  /* The old cabinet: Neon Swarm boots inside an iframe with its own loop,
+     input and localStorage — full isolation, zero shared globals. The
+     village freezes behind it (state ARCADE skips the world update). */
+  function openArcade() {
+    if (state !== 'PLAY' && state !== 'DIALOGUE') return;
+    var frame = document.getElementById('arcade-frame');
+    if (!arcadeOverlay || !frame) return;
+    WDialogue.close();
+    env.frozen = true;
+    WAudio.stopMusic();
+    frame.src = '../neon-swarm/index.html';
+    arcadeOverlay.hidden = false;
+    try { frame.contentWindow && frame.contentWindow.focus(); } catch (e) {}
+    state = 'ARCADE';
+    WAudio.sfx('interact');
+  }
+
+  function closeArcade() {
+    if (state !== 'ARCADE') return;
+    var frame = document.getElementById('arcade-frame');
+    /* If the run in there reached the DAWN ending, the cabinet remembers.
+       contentWindow is same-origin over http; file:// may refuse — fine. */
+    var won = false;
+    try {
+      won = !!(frame && frame.contentWindow && frame.contentWindow.GameCodex &&
+               frame.contentWindow.GameCodex.data && frame.contentWindow.GameCodex.data.won);
+    } catch (e) { won = false; }
+    if (frame) frame.src = 'about:blank';      // kills the loop + audio
+    if (arcadeOverlay) arcadeOverlay.hidden = true;
+    env.frozen = false;
+    curMusic = '';                              // re-trigger musicKey next update
+    state = 'PLAY';
+    if (won && !WStory.flag('arcade_dawn_seen')) {
+      WStory.setFlag('arcade_dawn_seen', true);
+      WHUD.toast('The cabinet screen dims, warmer somehow. Whatever slept in that grid just woke.');
+      WAudio.sfx('chime');
+    } else {
+      WAudio.sfx('click');
     }
   }
 
@@ -126,6 +184,7 @@ window.WGame = (function () {
     zoomTgt = 1;
     epi.shown = false;
     sleepFx.active = false;
+    snapCamera();
     syncEnv();
     WHUD.clearToasts();
     WHUD.resetWatchers();
@@ -175,11 +234,22 @@ window.WGame = (function () {
     zoomTgt = 1;
     epi.shown = !!WStory.lampLit;   // a lit lamp does not replay the epilogue
     sleepFx.active = false;
+    snapCamera();
     syncEnv();
     WHUD.resetWatchers();
     WHUD.clearToasts();
     WHUD.toast('Welcome back to Willowmere.');
     state = 'PLAY';
+  }
+
+  /* the smoothed follow starts from the player, never sweeps across the map */
+  function snapCamera() {
+    camFx = player.x;
+    camFy = player.y;
+    lookX = 0;
+    lookY = 0;
+    vista = null;
+    vinside = false;
   }
 
   function readSave() {
@@ -287,6 +357,22 @@ window.WGame = (function () {
       var ny = player.y + ax.y * player.speed * dt;
       if (boxFree(player.x, ny)) player.y = ny;
       player.walkT += dt;
+      /* footfall on every second walk-frame toggle (~2.7 steps/s): the synth
+         'footstep' blip + a puff of dust underfoot — both systems already
+         existed, so this is near-zero cost feedback for a walk-and-talk */
+      var t = (player.walkT * 5.5) | 0;
+      if (t !== lastStep) {
+        lastStep = t;
+        if (t % 2 === 0) {
+          WAudio.sfx('footstep');
+          if (window.WParticles) {
+            WParticles.emit('dust',
+              player.x + WU.rand(-4, 4), player.y + WU.rand(-2, 2),
+              { vx: WU.rand(-6, 6), vy: WU.rand(-16, -4), life: WU.rand(0.35, 0.6),
+                size: 1.5, color: 'rgba(150,132,96,0.8)' });
+          }
+        }
+      }
     }
   }
 
@@ -342,12 +428,20 @@ window.WGame = (function () {
   function updateVistaTrigger() {
     if (state !== 'PLAY' || sleepFx.active) return;
     var v = WWorld.vistaAt(player.x, player.y);
-    vinside = !!v;             // §2: trigger on ENTERING the radius; leaving a
-    if (!v) return;            // vista while still inside must not re-fire it
-    var first = !WWorld.vistaSeen(v);
+    if (!v) { vinside = false; return; }   // §2: fire on ENTERING the radius
+    if (vinside) return;                   // staying inside never re-fires it
+    vinside = true;
+    if (WWorld.vistaSeen(v)) {
+      /* a known view gets a short caption instead of the full takeover —
+         the panorama is for the first meeting, not the tenth crossing */
+      WWorld.markVistaSeen(v.id);
+      WHUD.toast(v.caption, 1500);
+      WAudio.sfx('chime');
+      return;
+    }
     WWorld.markVistaSeen(v.id);
     if (WStory && typeof WStory.onReach === 'function') WStory.onReach(v.id);
-    vista = { v: v, t: 0, first: first };
+    vista = { v: v, t: 0, first: true };
     state = 'VISTA';
     zoomTgt = 0.45;
     WAction.setAim(null);      // no sling dots over the panorama
@@ -395,6 +489,7 @@ window.WGame = (function () {
       case 'PAUSE': updatePause(dt); break;
       case 'SETTINGS': updateSettings(dt); break;
       case 'EPILOGUE': updateEpilogue(dt); break;
+      case 'ARCADE': break;   // world frozen; the iframe owns input + time
     }
 
     var key = musicKey();
@@ -414,7 +509,7 @@ window.WGame = (function () {
     var bs = WHUD.buttons();
     for (var i = 0; i < bs.length; i++) {
       if (hit(WInput.mouse, bs[i])) {
-        titleSel = i;
+        if (titleSel !== i) { titleSel = i; WAudio.sfx('click'); }  // hover = same cue as keys
         if (WInput.mouse.clicked) activateTitle();
       }
     }
@@ -433,6 +528,12 @@ window.WGame = (function () {
     }
   }
 
+  /* §2: a rain roll lasts to 17:00 only — nights stay clear (the roll itself
+     is deterministic per day, so this needs no extra state). */
+  function clearExpiredRain() {
+    if (env.weather === 'rain' && WU.hnorm(env.hour) >= 17) env.weather = 'clear';
+  }
+
   function updatePlay(dt) {
     if (sleepFx.active) {
       env.frozen = true;
@@ -448,6 +549,7 @@ window.WGame = (function () {
         WHUD.toast('Day ' + env.day + '.');
       }
     }
+    clearExpiredRain();
     syncEnv();
 
     WStory.update(env);
@@ -509,6 +611,7 @@ window.WGame = (function () {
     env.frozen = true;
     env.hour += dt / 20;
     if (env.hour >= 24) { env.hour -= 24; env.day += 1; env.weather = WWorld.weatherRoll(env.day); }
+    clearExpiredRain();
     syncEnv();
     WStory.update(env);
     WAction.update(dt, player, env);
@@ -528,7 +631,7 @@ window.WGame = (function () {
     var bs = WHUD.buttons();
     for (var i = 0; i < bs.length; i++) {
       if (hit(WInput.mouse, bs[i])) {
-        pauseSel = i;
+        if (pauseSel !== i) { pauseSel = i; WAudio.sfx('click'); }  // hover = same cue as keys
         if (WInput.mouse.clicked) activatePause();
       }
     }
@@ -574,10 +677,9 @@ window.WGame = (function () {
     var bs = WHUD.buttons();
     for (var i = 0; i < bs.length; i++) {
       if (hit(WInput.mouse, bs[i])) {
-        if (bs[i].id === 'music') settingsSel = 0;
-        else if (bs[i].id === 'sfx') settingsSel = 1;
-        else if (bs[i].id === 'mute') settingsSel = 2;
-        else settingsSel = 3;
+        var want = bs[i].id === 'music' ? 0 : bs[i].id === 'sfx' ? 1 :
+                   bs[i].id === 'mute' ? 2 : 3;
+        if (settingsSel !== want) { settingsSel = want; WAudio.sfx('click'); }
         if (WInput.mouse.clicked) {
           if (bs[i].id === 'back') { WAudio.sfx('click'); state = settingsReturn; }
           else if (bs[i].id === 'mute') {
@@ -621,8 +723,16 @@ window.WGame = (function () {
       cx = vista.v.x + Math.sin(performance.now() * 0.0003) * 14;
       cy = vista.v.y + Math.cos(performance.now() * 0.00023) * 10;
     } else {
-      cx = player.x;
-      cy = player.y;
+      /* smoothed follow + a small look-ahead in the walking direction, so a
+         step no longer jerks the whole frame; the ease matches the zoom's */
+      camFx += (player.x - camFx) * Math.min(1, dt * 7);
+      camFy += (player.y - camFy) * Math.min(1, dt * 7);
+      var ltx = player.moving ? (player.dir === 'left' ? -18 : player.dir === 'right' ? 18 : 0) : 0;
+      var lty = player.moving ? (player.dir === 'up' ? -12 : player.dir === 'down' ? 12 : 0) : 0;
+      lookX += (ltx - lookX) * Math.min(1, dt * 4);
+      lookY += (lty - lookY) * Math.min(1, dt * 4);
+      cx = camFx + lookX;
+      cy = camFy + lookY;
     }
     var b = WWorld.bounds();
     cam.x = WU.clamp(cx - vw / 2, b.x, b.x + b.w - vw);
@@ -648,6 +758,7 @@ window.WGame = (function () {
     var showPlayer = state !== 'TITLE';
     for (i = 0; i < list.length; i++) {
       n = list[i];
+      if (n.hidden) continue;    // away villagers (junie_leaves) draw nothing
       if (showPlayer && !playerDrawn && n.y > pY) {
         drawPlayerBody();
         playerDrawn = true;
@@ -742,7 +853,7 @@ window.WGame = (function () {
       WHUD.drawSettingsOn(ctx, settingsSel, WAudio.getMusicVolume(), WAudio.getSfxVolume(),
         WAudio.isMuted ? WAudio.isMuted() : false);
     } else {
-      /* PLAY / DIALOGUE */
+      /* PLAY / DIALOGUE / ARCADE (the iframe covers the screen anyway) */
       WHUD.draw(ctx, env, frameState);
     }
 
@@ -788,6 +899,8 @@ window.WGame = (function () {
     onDialogueOpened: function () {
       if (state === 'PLAY') state = 'DIALOGUE';
     },
+    openArcade: openArcade,
+    closeArcade: closeArcade,
     state: function () { return state; },
     player: player
   };

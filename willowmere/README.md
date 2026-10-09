@@ -164,6 +164,11 @@ trường nếu có lễ hội, bông moonbell phát sáng dưới chân tháp�
   cái nhún vai — thử lại thoải mái.
 - Ngủ từ 18:00 để qua ngày mới và lưu; quên lưu thì nút Save trong Pause vẫn
   ở đó.
+- **Chiếc tủ cũ cạnh nhà bạn** (bên phải cửa cottage) là một máy arcade kỳ lạ:
+  nhấn `E` để chơi **Neon Swarm** — mini-game bắn súng neon do chính làng cất
+  giữ. Làng đứng yên chờ bạn; thắng được trận DAWN bên trong thì cái tủ cũng
+  ấm hơn một chút. (Cần mở qua HTTP server hoặc `file://` — bấm `✕ LEAVE` để
+  về làng.)
 
 ## Credits — tài nguyên (toàn bộ CC0 / Public Domain)
 
