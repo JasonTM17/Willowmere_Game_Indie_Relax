@@ -53,9 +53,7 @@ window.WAction = (function () {
     { id: 'critter_glow_worm', biome: 'beach', from: 20, to: 2, rare: 0 },
     { id: 'critter_grasshopper', biome: 'hills', from: 7, to: 17, rare: 0 }
   ];
-  var CRITTER_UI_ROW = 5;   // ui.png minis, cols 0-9
-  var FISH_UI_ROW = 6;      // ui.png minis, cols 0-5
-  var ITEM_UI_ROW = 4;      // ui.png item icons
+  var ITEM_UI_ROW = 5;      // ui.png item icons (row 5: honey, seeds, moonbell…)
   var ITEM_UI_COL = {
     food_honeycomb: 0, seeds_pouch: 1, moonbell: 2, lens_cloth: 3,
     letter: 4, wool_cloak: 5, mote: 7
@@ -649,14 +647,9 @@ window.WAction = (function () {
   /* ---- drawing ---- */
 
   function drawCritter(ctx, c) {
-    var idx = -1, i;
-    for (i = 0; i < CRITTERS.length; i++) if (CRITTERS[i].id === c.id) { idx = i; break; }
+    /* vector shapes only: this atlas pack's critter cells hold unrelated
+       minis (honey pots, farm animals), so the tinted fallback is the truth */
     var bob = Math.sin(c.seed + (lastEnv ? lastEnv.hour * 60 : 0)) * 1.5;
-    if (window.WAssets && WAssets.has('ui') && idx >= 0) {
-      WAssets.sheet(ctx, 'ui', idx * 16, CRITTER_UI_ROW * 16, 16, 16,
-        c.x - 8, c.y - 16 + bob, 16, 16);
-      return;
-    }
     /* vector fallback: small body, type-tinted */
     var colors = {
       critter_butterfly: '#f2b6c6', critter_cricket: '#6b6b3a',

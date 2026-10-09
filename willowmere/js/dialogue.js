@@ -35,6 +35,9 @@ window.WDialogue = (function () {
   var giftItems = [];
   var giftSel = 0;
   var lastGift = null;      // {speaker, text}
+  var selMoved = false;     // arrows moved onto a choice this node (see advance)
+  var openAt = 0;           // when the current node opened (box slide-in)
+  var wrapCache = { key: '', font: '', maxW: -1, lines: null };
   var hitRects = [];        // {kind, i, x, y, w, h} for mouse clicks
   var canvasHooked = false;
   var canvas = null;
@@ -93,6 +96,17 @@ window.WDialogue = (function () {
       if (!inR) return false;
     }
     if (req.dayMin !== undefined && (e.day || 1) < req.dayMin) return false;
+    if (req.vistaMin !== undefined) {
+      /* §3.2 colours quest body: "visit 4 vistas (flag per vista)" — the
+         turn-in choices gate on the same count the HUD hint shows */
+      var seen = 0, W = window.WWorld, S2 = window.WStory;
+      if (W && W.vistas && S2) {
+        for (var vi = 0; vi < W.vistas.length; vi++) {
+          if (S2.flag('vista_' + W.vistas[vi].id)) seen++;
+        }
+      }
+      if (seen < req.vistaMin) return false;
+    }
     if (req.weather && req.weather !== 'any' && (e.weather || 'clear') !== req.weather) return false;
     if (req.quest) {
       var q = window.WStory && WStory.QUESTS ? WStory.QUESTS[req.quest.id] : null;
@@ -127,8 +141,10 @@ window.WDialogue = (function () {
     curSpeaker = resolve(n.speaker);
     typed = 0;
     sel = 0;
+    selMoved = false;
     giftMode = false;
     hitRects.length = 0;
+    openAt = (window.performance && performance.now) ? performance.now() : Date.now();
     if (window.WGame && typeof WGame.onDialogueOpened === 'function') {
       WGame.onDialogueOpened();              // PLAY -> DIALOGUE when in play
     }
@@ -151,10 +167,23 @@ window.WDialogue = (function () {
   }
 
   function visibleChoices() {
-    if (!cur || !cur.choices) return [];
     var out = [];
-    for (var i = 0; i < cur.choices.length; i++) {
-      if (checkRequires(cur.choices[i].requires)) out.push(cur.choices[i]);
+    if (cur && cur.choices) {
+      for (var i = 0; i < cur.choices.length; i++) {
+        if (checkRequires(cur.choices[i].requires)) out.push(cur.choices[i]);
+      }
+    }
+    /* §5.4: every NPC talk offers "(Give a gift…)" while the pouch holds
+       anything. The choice is injected (not authored) so greetings, unlocks
+       and quest nodes all grow it; the picker, WAction.gift and
+       WStory.onGive do the rest. gift_result itself is excluded so the
+       result line always ends the exchange cleanly. */
+    if (cur && npcCtx && curId !== 'gift_result' && window.WAction) {
+      var hasGift = false;
+      for (var j = 0; j < out.length; j++) if (out[j].gift) { hasGift = true; break; }
+      if (!hasGift && WAction.list().length > 0) {
+        out.push({ label: '(Give a gift\u2026)', gift: true, _gift: true });
+      }
     }
     return out;
   }
@@ -163,7 +192,12 @@ window.WDialogue = (function () {
     if (!cur) return;
     if (typed < curText.length) { typed = curText.length; return; }  // E completes first
     var vc = visibleChoices();
-    if (vc.length) { choose(sel); return; }
+    if (vc.length) {
+      /* A lone injected gift choice keeps E = polite close (§6): the gift is
+         chosen deliberately via its number key, a click, or ↑↓ + E. */
+      if (vc.length === 1 && vc[0]._gift && !selMoved) { close(); return; }
+      choose(sel); return;
+    }
     if (cur.next) {
       var nx = cur.next;
       if (!start(nx)) close();
@@ -331,45 +365,44 @@ window.WDialogue = (function () {
   }
 
   function drawPanel(ctx, x, y, w, h) {
-    if (window.WAssets && WAssets.has('ui')) {
-      /* 9-slice: 3x3 cells of 16px at (0,16) in ui.png */
-      var s = 16, ix = 0, iy = 16;
-      var x2 = x + w - s, y2 = y + h - s;
-      WAssets.sheet(ctx, 'ui', ix, iy, s, s, x, y, s, s);
-      WAssets.sheet(ctx, 'ui', ix + 2 * s, iy, s, s, x2, y, s, s);
-      WAssets.sheet(ctx, 'ui', ix, iy + 2 * s, s, s, x, y2, s, s);
-      WAssets.sheet(ctx, 'ui', ix + 2 * s, iy + 2 * s, s, s, x2, y2, s, s);
-      WAssets.sheet(ctx, 'ui', ix + s, iy, s, s, x + s, y, w - 2 * s, s);
-      WAssets.sheet(ctx, 'ui', ix + s, iy + 2 * s, s, s, x + s, y2, w - 2 * s, s);
-      WAssets.sheet(ctx, 'ui', ix, iy + s, s, s, x, y + s, s, h - 2 * s);
-      WAssets.sheet(ctx, 'ui', ix + 2 * s, iy + s, s, s, x2, y + s, s, h - 2 * s);
-      WAssets.sheet(ctx, 'ui', ix + s, iy + s, s, s, x + s, y + s, w - 2 * s, h - 2 * s);
-      return;
-    }
-    ctx.fillStyle = 'rgba(24,28,38,0.9)';
-    ctx.strokeStyle = 'rgba(255,232,180,0.45)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(x, y, w, h, 10);
-    else ctx.rect(x, y, w, h);
-    ctx.fill();
-    ctx.stroke();
+    /* shared vector panel (util.js) — the ui.png 9-slice sampled critter
+       icons and smeared blue across the box; WU.panel keeps one coherent
+       dusk-parchment look with every other screen */
+    WU.panel(ctx, x, y, w, h, { radius: 12 });
   }
 
   function drawPips(ctx, x, y, hearts) {
-    ctx.font = '10px "Segoe UI",Verdana,sans-serif';
-    for (var i = 0; i < 10; i++) {
-      var on = hearts >= i + 1, half = !on && hearts > i;
-      ctx.fillStyle = on ? '#ff6c96' : half ? '#ff6c96' : 'rgba(255,255,255,0.18)';
-      if (half) {
-        ctx.save();
-        ctx.beginPath(); ctx.rect(x + i * 13, y - 9, 6.5, 10); ctx.clip();
-        ctx.fillText('\u2665', x + i * 13, y);
-        ctx.restore();
-        ctx.fillStyle = 'rgba(255,255,255,0.18)';
-        ctx.fillText('\u2665', x + i * 13, y);
+    var i, on, half;
+    var useAtlas = window.WAssets && WAssets.has('ui');
+    for (i = 0; i < 10; i++) {
+      on = hearts >= i + 1;
+      half = !on && hearts > i;
+      var hx = x + i * 15;
+      if (useAtlas) {
+        var col = on || half ? 0 : 1;
+        WAssets.sheet(ctx, 'ui', col * 16, 4 * 16, 16, 16, hx, y - 13, 13, 13);
+        if (half) {
+          /* half heart = empty sprite, then the full sprite clipped left */
+          ctx.save();
+          ctx.beginPath(); ctx.rect(hx, y - 13, 6.5, 13); ctx.clip();
+          WAssets.sheet(ctx, 'ui', 0, 4 * 16, 16, 16, hx, y - 13, 13, 13);
+          ctx.restore();
+        }
       } else {
-        ctx.fillText('\u2665', x + i * 13, y);
+        ctx.font = '12px "Segoe UI",Verdana,sans-serif';
+        ctx.textAlign = 'left';
+        if (half) {
+          ctx.fillStyle = 'rgba(255,255,255,0.18)';
+          ctx.fillText('\u2665', hx, y);
+          ctx.save();
+          ctx.beginPath(); ctx.rect(hx, y - 10, 6.5, 12); ctx.clip();
+          ctx.fillStyle = '#ff6c96';
+          ctx.fillText('\u2665', hx, y);
+          ctx.restore();
+        } else {
+          ctx.fillStyle = on ? '#ff6c96' : 'rgba(255,255,255,0.18)';
+          ctx.fillText('\u2665', hx, y);
+        }
       }
     }
   }
@@ -388,8 +421,21 @@ window.WDialogue = (function () {
     }
     var tint = CHAR_COLORS[spk] || '#5a6470';
     var row = SPRITE_ROW[spk];
-    ctx.fillStyle = 'rgba(14,17,24,0.85)';
+    /* rounded well + soft inner gradient */
+    ctx.save();
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, y, size, size, 9);
+    else ctx.rect(x, y, size, size);
+    ctx.clip();
+    var pg = ctx.createLinearGradient(0, y, 0, y + size);
+    pg.addColorStop(0, 'rgba(30,28,40,0.9)');
+    pg.addColorStop(1, 'rgba(14,13,20,0.95)');
+    ctx.fillStyle = pg;
     ctx.fillRect(x, y, size, size);
+    ctx.fillStyle = tint;
+    ctx.globalAlpha = 0.14;
+    ctx.fillRect(x, y, size, size);
+    ctx.globalAlpha = 1;
     if (row !== undefined && window.WAssets && WAssets.has('chars')) {
       WAssets.sheet(ctx, 'chars', 0, row * 48, 32, 48,
         x + 8, y + 6, size - 16, size - 12);
@@ -406,34 +452,66 @@ window.WDialogue = (function () {
       ctx.fillRect(cx - 5, y + size * 0.37, 2.5, 3);
       ctx.fillRect(cx + 2.5, y + size * 0.37, 2.5, 3);
     }
+    ctx.restore();
+    /* speaker-tinted rim + gold hairline */
     ctx.strokeStyle = tint;
-    ctx.lineWidth = 3;
-    ctx.strokeRect(x + 1.5, y + 1.5, size - 3, size - 3);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x + 1, y + 1, size - 2, size - 2, 8);
+    else ctx.rect(x + 1, y + 1, size - 2, size - 2);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(240,200,130,0.45)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x + 3.5, y + 3.5, size - 7, size - 7, 6);
+    else ctx.rect(x + 3.5, y + 3.5, size - 7, size - 7);
+    ctx.stroke();
   }
 
   function itemIcon(key, x, y) {
-    if (!window.WAssets || !WAssets.has('ui')) return;
     var A = window.WAction;
-    var cell = null;
     if (A && A.ITEMS[key]) {
       var kind = A.ITEMS[key].kind;
-      if (kind === 'critter') {
-        var ci = -1, ORD = ['critter_butterfly', 'critter_cricket', 'critter_oak_beetle',
-          'critter_firefly', 'critter_luna_moth', 'critter_dragonfly', 'critter_mayfly',
-          'critter_sand_crab', 'critter_glow_worm', 'critter_grasshopper'];
-        for (var i = 0; i < ORD.length; i++) if (ORD[i] === key) { ci = i; break; }
-        if (ci >= 0) cell = [ci, 5];
-      } else if (kind === 'fish') {
-        var fi = -1, FOR = ['fish_minnow', 'fish_perch', 'fish_flounder',
-          'fish_trout', 'fish_carp', 'fish_moonfish'];
-        for (var j = 0; j < FOR.length; j++) if (FOR[j] === key) { fi = j; break; }
-        if (fi >= 0) cell = [fi, 6];
-      } else if (A.ITEM_UI_COL[key] !== undefined) {
-        cell = [A.ITEM_UI_COL[key], 4];
+      if (kind === 'critter' || kind === 'fish') {
+        /* this atlas pack has no critter/fish minis — kind-tinted token */
+        WU.gemToken(ctx, x + 8, y + 8, 8, Math.abs(WAssets.keyHue(key)) % 360);
+        return;
+      }
+      if (A.ITEM_UI_COL[key] !== undefined && window.WAssets && WAssets.has('ui')) {
+        WAssets.sheet(ctx, 'ui', A.ITEM_UI_COL[key] * 16, 5 * 16, 16, 16, x, y, 16, 16);
       }
     }
-    if (cell) WAssets.sheet(ctx, 'ui', cell[0] * 16, cell[1] * 16, 16, 16, x, y, 16, 16);
   }
+
+  /* Progressive reveal of the CACHED full-line wrap: a prefix of a line
+     always fits where the full line fits, so the type-on never re-measures. */
+  function typedLines(shown) {
+    var key = curId + '\u0001' + curText;
+    if (wrapCache.key !== key) {
+      wrapCache.key = key;
+      wrapCache.font = null;         // forces the font/maxW re-check below
+      wrapCache.lines = null;
+    }
+    if (wrapCache.font !== curFont || wrapCache.maxW !== curMaxW) {
+      wrapCache.font = curFont;
+      wrapCache.maxW = curMaxW;
+      wrapCache.lines = wrap(tctx, curText, curMaxW);
+    }
+    var lines = wrapCache.lines || [];
+    var out = [], used = 0, i;
+    for (i = 0; i < lines.length; i++) {
+      var L = lines[i];
+      var cost = L.length + (i > 0 ? 1 : 0);   // the joining space
+      if (used + cost > shown) {
+        out.push(L.slice(0, Math.max(0, shown - used)));
+        return out;
+      }
+      out.push(L);
+      used += cost;
+    }
+    return out;
+  }
+  var curFont = '', curMaxW = 0, tctx = null;
 
   function draw(ctx) {
     if (!cur) return;
@@ -444,9 +522,18 @@ window.WDialogue = (function () {
     var vw = ctx.canvas.width / dprv;
     var vh = ctx.canvas.height / dprv;
     var w = Math.min(760, vw - 80);
-    var h = 176;
+    var vc = visibleChoices();
+    /* the box grows so the choice list never climbs into the typed text or
+       the portrait (portrait bottom sits at y+94; choices start y+128) */
+    var h = vc.length ? Math.max(176, 128 + vc.length * 24) : 176;
     var x = (vw - w) / 2;
     var y = vh - h - 18;
+
+    /* soft entrance: slide up + fade over ~180 ms (no state change) */
+    var now = (window.performance && performance.now) ? performance.now() : Date.now();
+    var eIn = WU.easeInOut(Math.min(1, (now - openAt) / 180));
+    y += (1 - eIn) * 12;
+    ctx.globalAlpha = 0.25 + 0.75 * eIn;
     drawPanel(ctx, x, y, w, h);
 
     var isNarr = curSpeaker === 'narrator' || curSpeaker === '';
@@ -455,19 +542,47 @@ window.WDialogue = (function () {
     /* portrait */
     if (portrait) drawPortrait(ctx, x + 14, y + 18, 76);
 
-    /* name plate */
+    /* name plate — dark pill, speaker-tinted edge, gold hairline */
     if (!isNarr) {
+      /* display name: map raw ids ("hana") back to the character's full name */
+      var spkName = curSpeaker;
+      if (window.WNpcs) {
+        for (var dn = 0; dn < WNpcs.DEFS.length; dn++) {
+          if (WNpcs.DEFS[dn].name === curSpeaker || WNpcs.DEFS[dn].id === curSpeaker) {
+            spkName = WNpcs.DEFS[dn].name.split(' ')[0];
+            break;
+          }
+        }
+      }
       ctx.font = 'bold 13px "Segoe UI",Verdana,sans-serif';
-      var nw = ctx.measureText(curSpeaker).width + 24;
+      var nw = ctx.measureText(spkName).width + 34;
       var tint = CHAR_COLORS[curSpeaker] || '#ffd98a';
+      var nx = x + 100;
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(nx, y - 13, nw, 26, 13);
+      else ctx.rect(nx, y - 13, nw, 26);
+      ctx.fill();
+      var ng = ctx.createLinearGradient(0, y - 13, 0, y + 13);
+      ng.addColorStop(0, 'rgba(52,48,62,0.98)');
+      ng.addColorStop(1, 'rgba(30,28,38,0.98)');
+      ctx.fillStyle = ng;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(nx, y - 13, nw, 26, 13);
+      else ctx.rect(nx, y - 13, nw, 26);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(240,200,130,0.55)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      /* speaker-colour tab */
       ctx.fillStyle = tint;
       ctx.beginPath();
-      if (ctx.roundRect) ctx.roundRect(x + 100, y - 12, nw, 24, 6);
-      else ctx.rect(x + 100, y - 12, nw, 24);
+      if (ctx.roundRect) ctx.roundRect(nx + 6, y - 7, 4, 14, 2);
+      else ctx.rect(nx + 6, y - 7, 4, 14);
       ctx.fill();
-      ctx.fillStyle = '#241c10';
+      ctx.fillStyle = '#ffe9b8';
       ctx.textAlign = 'left';
-      ctx.fillText(curSpeaker, x + 112, y + 4);
+      ctx.fillText(spkName, nx + 18, y + 5);
     } else {
       ctx.font = 'italic 12px Georgia,serif';
       ctx.fillStyle = 'rgba(242,234,216,0.55)';
@@ -479,13 +594,15 @@ window.WDialogue = (function () {
       drawPips(ctx, x + w - 150, y + 2, WNpcs.friend(npcCtx.id));
     }
 
-    /* typed text */
+    /* typed text (measured once per node, revealed per frame) */
     ctx.font = isNarr ? 'italic 15px Georgia,serif' : '15px "Segoe UI",Verdana,sans-serif';
     ctx.fillStyle = '#f2ead8';
     ctx.textAlign = 'left';
     var tx = portrait ? x + 104 : x + 20;
-    var shown = curText.slice(0, Math.floor(typed));
-    var lines = wrap(ctx, shown, w - (portrait ? 144 : 60));
+    curFont = ctx.font;
+    curMaxW = w - (portrait ? 144 : 60);
+    tctx = ctx;
+    var lines = typedLines(Math.floor(typed));
     for (var i = 0; i < lines.length && i < 4; i++) {
       ctx.fillText(lines[i], tx, y + 38 + i * 21);
     }
@@ -520,7 +637,6 @@ window.WDialogue = (function () {
     }
 
     /* choices (visible once the line finished typing) */
-    var vc = visibleChoices();
     if (vc.length && typed >= curText.length) {
       var cy = y + h - vc.length * 24 - 10;
       ctx.font = '14px "Segoe UI",Verdana,sans-serif';
@@ -528,36 +644,59 @@ window.WDialogue = (function () {
         var ry2 = cy + i * 24;
         hitRects.push({ kind: 'choice', i: i, x: x + 14, y: ry2 - 15, w: w - 28, h: 22 });
         if (i === sel) {
-          ctx.fillStyle = 'rgba(255,214,130,0.16)';
-          ctx.fillRect(x + 16, ry2 - 15, w - 32, 22);
+          ctx.fillStyle = 'rgba(255,214,130,0.14)';
+          ctx.beginPath();
+          if (ctx.roundRect) ctx.roundRect(x + 16, ry2 - 15, w - 32, 22, 11);
+          else ctx.rect(x + 16, ry2 - 15, w - 32, 22);
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(255,214,130,0.75)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          /* number badge */
+          ctx.fillStyle = '#ffd98a';
+          ctx.beginPath(); ctx.arc(x + 28, ry2 - 4, 7.5, 0, WU.TAU); ctx.fill();
+          ctx.fillStyle = '#241c10';
+          ctx.font = 'bold 11px "Segoe UI",Verdana,sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(String(i + 1), x + 28, ry2 - 0.5);
+          ctx.font = '14px "Segoe UI",Verdana,sans-serif';
           ctx.fillStyle = '#ffd98a';
           ctx.textAlign = 'left';
-          ctx.fillText((i + 1) + '. \u25b8 ' + vc[i].label, x + 20, ry2);
+          ctx.fillText('\u25b8', x + 40, ry2);
+          ctx.fillText(vc[i].label, x + 54, ry2);
         } else {
-          ctx.fillStyle = '#cfc6b0';
+          ctx.fillStyle = 'rgba(207,198,176,0.85)';
           ctx.textAlign = 'left';
-          ctx.fillText((i + 1) + '.   ' + vc[i].label, x + 20, ry2);
+          ctx.fillText((i + 1) + '.', x + 22, ry2);
+          ctx.fillStyle = 'rgba(242,234,216,0.78)';
+          ctx.fillText(vc[i].label, x + 54, ry2);
         }
       }
-    } else if (typed >= curText.length) {
+    } else if (typed >= curText.length ||
+               (vc.length === 1 && vc[0]._gift && !selMoved)) {
+      /* the lone injected gift keeps E as "end conversation" (§6) */
       var pulse = 0.55 + 0.45 * Math.sin(performance.now() * 0.005);
+      ctx.globalAlpha = 0.35 + 0.3 * pulse;
+      WU.keycap(ctx, x + w - 58, y + h - 26, 18, 'E');
+      ctx.globalAlpha = 1;
       ctx.font = '12px "Segoe UI",Verdana,sans-serif';
-      ctx.fillStyle = 'rgba(242,234,216,' + (0.35 + 0.3 * pulse) + ')';
+      ctx.fillStyle = 'rgba(242,234,216,0.8)';
       ctx.textAlign = 'left';
-      ctx.fillText('E \u25b8', x + w - 40, y + h - 12);
+      ctx.fillText('\u25b8', x + w - 34, y + h - 12);
     }
+    ctx.globalAlpha = 1;
   }
 
   /* keyboard nav, called by main */
   function navUp() {
     if (giftMode) { giftMove(-1); return; }
     var vc = visibleChoices();
-    if (vc.length) { sel = (sel - 1 + vc.length) % vc.length; if (window.WAudio) WAudio.sfx('click'); }
+    if (vc.length) { sel = (sel - 1 + vc.length) % vc.length; selMoved = true; if (window.WAudio) WAudio.sfx('click'); }
   }
   function navDown() {
     if (giftMode) { giftMove(1); return; }
     var vc = visibleChoices();
-    if (vc.length) { sel = (sel + 1) % vc.length; if (window.WAudio) WAudio.sfx('click'); }
+    if (vc.length) { sel = (sel + 1) % vc.length; selMoved = true; if (window.WAudio) WAudio.sfx('click'); }
   }
   function confirm() {
     if (giftMode) { giftGive(); return; }

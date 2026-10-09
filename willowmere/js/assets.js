@@ -156,6 +156,7 @@
     has: has,
     audio: audio,
     sheet: sheet,
+    keyHue: keyHue,
     /* true once every manifest key has settled ok or missing */
     isLoaded: function () { return finished; },
     progress: function () { return { done: done, total: total }; }

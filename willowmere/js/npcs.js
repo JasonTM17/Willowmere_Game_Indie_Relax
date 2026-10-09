@@ -10,11 +10,13 @@
      90 s pair cooldown. Speech bubbles above the current speaker on both
      sides as the lines alternate; within 5 tiles of the pair POI the current
      line also renders full-length in an "overheard" panel.
-   NOTE on schedules: DESIGN §3.3 pair windows are hard hooks, so a few §3.1
-   schedule beats were nudged (geography made some pairs unreachable); the
-   flavour of every beat is kept. Bodies are drawn by main's y-sort pass, so
-   drawBody/drawChar take the CURRENT camera (same frame as the world pass) —
-   an omitted cam falls back to the cached one from draw(). */
+   NOTE on schedules: DESIGN §3.1 beats are restored in DEFS below; where a
+   §3.3 pair window and a §3.1 beat could not both hold (the map is crossed
+   at real-time 42 px/s, ~2-3 h between distant POIs), the pair window was
+   re-pinned to where the beats actually overlap — see the PAIRS note.
+   Bodies are drawn by main's y-sort pass, so drawBody/drawChar take the
+   CURRENT camera (same frame as the world pass) — an omitted cam falls back
+   to the cached one from draw(). */
 window.WNpcs = (function () {
   'use strict';
 
@@ -59,12 +61,17 @@ window.WNpcs = (function () {
     {
       id: 'rosa', name: 'Rosa Quill', role: 'retired teacher', homePoi: 'rosa_door',
       spriteRow: 3, voice: 'rosa', speed: 42,
+      /* §3.1: 7-9 garden · 9-12 pier · 12-14 nap · 14-17 bench · 17-19 green ·
+         19+ home. Bench ends 30 min early so the Junie/Rosa palette pair
+         (am_colors) still overlaps on the green; Rosa's bench->green walk
+         takes ~0.6 h, so the pair fires from ~17.6. */
       schedule: [
+        { from: 0, to: 7, poi: 'rosa_door' },
         { from: 7, to: 9, poi: 'garden' },
         { from: 9, to: 12.5, poi: 'pier' },
         { from: 12.5, to: 14, poi: 'rosa_door' },
-        { from: 14, to: 15, poi: 'garden_bench' },
-        { from: 15, to: 20.5, poi: 'green_well' },
+        { from: 14, to: 16.5, poi: 'garden_bench' },
+        { from: 16.5, to: 20.5, poi: 'green_well' },
         { from: 20.5, to: 24, poi: 'rosa_door' }
       ],
       rainPoi: 'rosa_door',
@@ -77,13 +84,21 @@ window.WNpcs = (function () {
     {
       id: 'marlow', name: 'Old Marlow', role: 'former keeper', homePoi: 'marlow_hut_door',
       spriteRow: 4, voice: 'marlow', speed: 42,
+      /* §3.1: 5-8 tide pools · 8-11 hut · 11-15 driftwood loop · 15-18 hut ·
+         18-21 lighthouse base · 21+ hut. The engine walks at real-time
+         42 px/s (hut -> beach = ~3.2 h), so the tide-pool commute is packed
+         into 2-5 and he stands the whole §3.1 5-8 beat. Lighthouse runs to
+         21.5 so Finn's evening visit overlaps it (pair am_lamp). */
       schedule: [
-        { from: 0, to: 8, poi: 'hut' },
-        { from: 8, to: 11.5, poi: 'driftwood_1' },
-        { from: 11.5, to: 14, poi: 'driftwood_2' },
-        { from: 14, to: 18, poi: 'hut' },
-        { from: 18, to: 23.5, poi: 'lighthouse_base' },
-        { from: 23.5, to: 24, poi: 'hut' }
+        { from: 0, to: 2, poi: 'hut' },
+        { from: 2, to: 5, poi: 'tide_pools' },
+        { from: 5, to: 8, poi: 'tide_pools' },
+        { from: 8, to: 11, poi: 'hut' },
+        { from: 11, to: 13, poi: 'driftwood_1' },
+        { from: 13, to: 15, poi: 'driftwood_2' },
+        { from: 15, to: 18, poi: 'hut' },
+        { from: 18, to: 21.5, poi: 'lighthouse_base' },
+        { from: 21.5, to: 24, poi: 'hut' }
       ],
       rainPoi: null,
       loved: ['critter_glow_worm', 'fish_moonfish'],
@@ -95,12 +110,18 @@ window.WNpcs = (function () {
     {
       id: 'finn', name: 'Finn Marlow', role: 'grandson', homePoi: 'finn_door',
       spriteRow: 5, voice: 'finn', speed: 42,
+      /* §3.1 beats restored: dawn pier (with the Rosa duck-lunch pair),
+         forest scout loop, beach tide pools, green games, a wait for
+         grandpa at the tower, home late evening. Long walks are absorbed by
+         the beat windows (pier -> scout trail alone is ~1.7 h). */
       schedule: [
-        { from: 5.5, to: 12.5, poi: 'pier' },
-        { from: 12.5, to: 15.5, poi: 'lake_edge' },
-        { from: 15.5, to: 20.5, poi: 'dock' },
-        { from: 20.5, to: 23.5, poi: 'lighthouse_base' },
-        { from: 23.5, to: 24, poi: 'finn_door' }
+        { from: 0, to: 5.5, poi: 'finn_door' },
+        { from: 5.5, to: 12, poi: 'pier' },
+        { from: 12, to: 14, poi: 'scout_trail_1' },
+        { from: 14, to: 17, poi: 'tide_pools' },
+        { from: 17, to: 19.5, poi: 'green_games' },
+        { from: 19.5, to: 21, poi: 'lighthouse_base' },
+        { from: 21, to: 24, poi: 'finn_door' }
       ],
       rainPoi: null,
       loved: ['fish_any', 'critter_dragonfly'],
@@ -112,10 +133,16 @@ window.WNpcs = (function () {
     {
       id: 'hana', name: 'Hana Oak', role: 'shopkeeper', homePoi: 'shop_door',
       spriteRow: 6, voice: 'hana', speed: 42,
+      /* §3.1: the 7-8 mail round walks past the front doors again (east
+         cottages -> the Warden's cottage), ending at the bakery ~08:30,
+         where the parcels-vs-pastries pair (am_post) fires. */
       schedule: [
-        { from: 7, to: 7.5, poi: 'shop_counter' },
-        { from: 7.5, to: 8.5, poi: 'bakery_door' },
-        { from: 8.5, to: 18, poi: 'shop_counter' },
+        { from: 0, to: 7, poi: 'shop_door' },
+        { from: 7, to: 7.5, poi: 'cottageC_door' },
+        { from: 7.5, to: 8.1, poi: 'cottageA_door' },
+        { from: 8.1, to: 8.5, poi: 'player_door' },
+        { from: 8.5, to: 9, poi: 'bakery_door' },
+        { from: 9, to: 18, poi: 'shop_counter' },
         { from: 18, to: 21.5, poi: 'dock' },
         { from: 21.5, to: 24, poi: 'shop_door' }
       ],
@@ -129,12 +156,17 @@ window.WNpcs = (function () {
     {
       id: 'bramble', name: 'Bramble', role: 'shepherd', homePoi: 'bramble_hut_door',
       spriteRow: 7, voice: 'bramble', speed: 42,
+      /* §3.1: 5-9 pasture walk (split across the flock POIs so the rounds
+         are visible), 9-12 west overlook, 12-14 nap tree, 14-18 pasture,
+         18-19 lake edge, 19+ hut. */
       schedule: [
-        { from: 5, to: 6.5, poi: 'bramble_hut_door' },
-        { from: 6, to: 8, poi: 'marlow_hut_door' },
-        { from: 8, to: 11, poi: 'west_overlook' },
-        { from: 11, to: 13.5, poi: 'nap_tree' },
-        { from: 13.5, to: 18, poi: 'pasture_2' },
+        { from: 0, to: 5, poi: 'bramble_hut_door' },
+        { from: 5, to: 6.5, poi: 'pasture_1' },
+        { from: 6.5, to: 8, poi: 'pasture_3' },
+        { from: 8, to: 9, poi: 'pasture_2' },
+        { from: 9, to: 12, poi: 'west_overlook' },
+        { from: 12, to: 14, poi: 'nap_tree' },
+        { from: 14, to: 18, poi: 'pasture_2' },
         { from: 18, to: 19.5, poi: 'lake_edge' },
         { from: 19.5, to: 24, poi: 'bramble_hut_door' }
       ],
@@ -148,11 +180,17 @@ window.WNpcs = (function () {
     {
       id: 'junie', name: 'Junie Vale', role: 'painter', homePoi: 'tent_door',
       spriteRow: 8, voice: 'junie', speed: 42,
+      /* §3.1 with the 18-20 sunset beat restored at the Tor: the green
+         session ends 17.5 and she reaches the Tor ~20.2 (green -> Tor is
+         ~2.9 h), painting the last light until 21.5. The forest light-shaft
+         beat (15-18) had to give: the Tor is a full map away from the north
+         forest at this engine's walk speed. */
       schedule: [
+        { from: 0, to: 6, poi: 'tent_door' },
         { from: 6, to: 10, poi: 'easel' },
         { from: 10, to: 13.5, poi: 'pier' },
-        { from: 13.5, to: 16.5, poi: 'green_well' },
-        { from: 16.5, to: 21.5, poi: 'forest_paint' },
+        { from: 13.5, to: 17.5, poi: 'green_well' },
+        { from: 17.5, to: 21.5, poi: 'tor' },
         { from: 21.5, to: 24, poi: 'tent_door' }
       ],
       rainPoi: 'tent_door',
@@ -165,8 +203,14 @@ window.WNpcs = (function () {
   ];
 
   /* ---- ambient pairs (§3.3). requires checked via WWorld.checkReq /
-     WDialogue.checkRequires (flags · quest state). Windows widened where the
-     walk budget demanded; every pair is reachable on the final schedules. ---- */
+     WDialogue.checkRequires (flags · quest state · vistaMin). Windows are
+     pinned to where the restored §3.1 schedules actually put both members:
+     cross-map walks take 2-3 h at this engine's speed, so a pair only fires
+     while BOTH schedule beats target the same POI. am_tide (Marlow+Bramble)
+     has no shared geography under faithful §3.1 — his mornings are at the
+     tide pools, Bramble's on the pasture — so it is kept as §3.3 data but
+     does not fire; am_forecast lost its dock overlap to Finn's green games.
+     am_lamp fires in the short window where both stand at the tower base. ---- */
   var PAIRS = [
     { id: 'am_honey', a: 'mira', b: 'gideon', poi: 'green_well', hour: [11, 13], requires: null, lines: [
       { sp: 'mira', text: 'Forty years, Gideon, and you still haggle over honey.' },
@@ -180,24 +224,26 @@ window.WNpcs = (function () {
       { sp: 'finn', text: 'Kevin. Kevin. KEVIN. He remembers me, watch!' },
       { sp: 'rosa', text: 'He remembers the bread, dear. Let him.' }
     ] },
-    { id: 'am_post', a: 'hana', b: 'mira', poi: 'bakery_door', hour: [7.5, 8.5], requires: null, lines: [
+    { id: 'am_post', a: 'hana', b: 'mira', poi: 'bakery_door', hour: [8.4, 9], requires: null, lines: [
       { sp: 'hana', text: 'Three parcels, one summons, zero pastries reserved.' },
       { sp: 'mira', text: 'One parcel, and I will trade you a heel of honey loaf.' },
       { sp: 'hana', text: 'Feelings: out of stock. Carbs: overstocked. Deal.' }
     ] },
-    { id: 'am_tide', a: 'marlow', b: 'bramble', poi: 'hut', hour: [6, 8], requires: null, lines: [
+    /* kept for §3.3 fidelity; unreachable on the restored schedules (see NOTE) */
+    { id: 'am_tide', a: 'marlow', b: 'bramble', poi: 'tide_pools', hour: [5, 8], requires: null, lines: [
       { sp: 'marlow', text: 'A keeper keeps. I keep meaning to say something.' },
       { sp: 'bramble', text: 'Hm. Fourteen herons this morning. Good number.' },
       { sp: 'marlow', text: 'Kettle is on, if your silence wants company.' },
       { sp: 'bramble', text: 'It does.' }
     ] },
+    /* lost its overlap when Finn's §3.1 green-games beat came back */
     { id: 'am_forecast', a: 'finn', b: 'hana', poi: 'dock', hour: [19, 21], requires: null, lines: [
       { sp: 'finn', text: 'Biggest. Fog. EVER. Tomorrow. I feel it in my boots!' },
       { sp: 'hana', text: 'Forecast: clouds, with a chance of you being right once.' },
       { sp: 'finn', text: 'You will SEE. And then you will owe me a ta\u2026 a compliment.' },
       { sp: 'hana', text: 'Rain check.' }
     ] },
-    { id: 'am_colors', a: 'junie', b: 'rosa', poi: 'green_well', hour: [15, 17],
+    { id: 'am_colors', a: 'junie', b: 'rosa', poi: 'green_well', hour: [16.9, 17.6],
       requires: { flags: ['met_junie'] }, lines: [
       { sp: 'junie', text: 'Your garden is a held breath, Rosa. A whole palette.' },
       { sp: 'rosa', text: 'When I was young I called it weeds. Age improved my eye.' },
@@ -230,6 +276,7 @@ window.WNpcs = (function () {
   var queued = {};        // pairId -> in pend
   var cool = {};          // pairId -> seconds left
   var startCd = 0;        // gap between session starts
+  var pathBudget = 0;     // BFS runs allowed this frame (reset in update)
   var LINE_T = 6;         // seconds per spoken line (§3.3 cycle)
   var NEAR = 96;          // 3 tiles from the pair POI
   var OVERHEAR = 160;     // 5 tiles for the full-length panel
@@ -328,12 +375,20 @@ window.WNpcs = (function () {
       }
     }
     if (found < 0) return null;
-    var path = [], n = found;
-    while (n !== -1) {
-      path.push({ x: (n % W2) * T + 16, y: ((n / W2) | 0) * T + 16 });
-      n = bfsPrev[n];
+    /* collect start->goal and keep every 2nd waypoint (the goal is always
+       kept): stepToward's probe fan absorbs skipped tiles, halving the
+       waypoint-object churn on long crossings */
+    var rev = [];
+    var n = found;
+    while (n !== -1) { rev.push(n); n = bfsPrev[n]; }
+    var path = [];
+    var k;
+    for (k = rev.length - 1; k >= 0; k -= 2) {
+      path.push({ x: (rev[k] % W2) * T + 16, y: ((rev[k] / W2) | 0) * T + 16 });
     }
-    path.reverse();
+    if ((rev.length - 1) % 2 !== 0) {
+      path.push({ x: (rev[0] % W2) * T + 16, y: ((rev[0] / W2) | 0) * T + 16 });
+    }
     return path;
   }
 
@@ -369,6 +424,16 @@ window.WNpcs = (function () {
   function updateNpc(n, dt, env) {
     var h = env && env.hour !== undefined ? WU.hnorm(env.hour) : 12;
     var name = schedulePoi(n.def, h);
+    /* outcome scenery (§3.2 junie_leaves): after the dark study she is away
+       for the city during the day — parked (and hidden) at the tent from
+       dawn to dusk, back home in the evenings. */
+    if (n.id === 'junie' && window.WStory && typeof WStory.flag === 'function' &&
+        WStory.flag('junie_leaves')) {
+      if (h >= 6 && h < 18) { n.hidden = true; name = n.def.homePoi; }
+      else { n.hidden = false; name = 'tent_door'; }
+    } else if (n.id === 'junie') {
+      n.hidden = false;
+    }
     if (env && env.weather === 'rain' && h >= 9 && h < 17 && n.def.rainPoi) {
       name = n.def.rainPoi;
     }
@@ -406,15 +471,23 @@ window.WNpcs = (function () {
       return;
     }
 
-    /* travel: follow the BFS path to the schedule POI */
+    /* travel: follow the BFS path to the schedule POI. At most 2 BFS runs
+       per frame (hour switches otherwise make several NPCs pathfind in the
+       same tick); whoever misses the budget probe-walks one frame. */
     if (!n.path) {
       var T = (window.WWorld && WWorld.TILE) || 32;
-      n.path = findPath((n.x / T) | 0, (n.y / T) | 0,
-                        (n.anchor.x / T) | 0, (n.anchor.y / T) | 0);
-      n.pi = 0;
-      n.stuckT = 0;
-      if (!n.path) { stepToward(n, n.anchor.x, n.anchor.y, dt); return; } // probe fallback
-      if (!n.path.length) { n.mode = 'idle'; n.idleT = WU.rand(2, 4); return; }
+      if (pathBudget > 0) {
+        pathBudget--;
+        n.path = findPath((n.x / T) | 0, (n.y / T) | 0,
+                          (n.anchor.x / T) | 0, (n.anchor.y / T) | 0);
+        n.pi = 0;
+        n.stuckT = 0;
+        if (!n.path) { stepToward(n, n.anchor.x, n.anchor.y, dt); return; } // probe fallback
+        if (!n.path.length) { n.mode = 'idle'; n.idleT = WU.rand(2, 4); return; }
+      } else {
+        stepToward(n, n.anchor.x, n.anchor.y, dt);   // budget spent: probe this frame
+        return;
+      }
     }
     var wp = n.path[n.pi];
     var last = n.pi >= n.path.length - 1;
@@ -444,6 +517,7 @@ window.WNpcs = (function () {
   }
 
   function update(dt, env) {
+    pathBudget = 2;          // at most 2 BFS pathfinds per frame
     for (var i = 0; i < list.length; i++) updateNpc(list[i], dt, env);
     ambient(dt, env);
   }
@@ -586,6 +660,7 @@ window.WNpcs = (function () {
     var best = null, bestD = r;
     for (var i = 0; i < list.length; i++) {
       var n = list[i];
+      if (n.hidden) continue;               // away villagers take no prompts
       var d = WU.dist(px, py, n.x, n.y);
       if (d <= bestD) { bestD = d; best = n; }
     }
@@ -665,9 +740,24 @@ window.WNpcs = (function () {
     return lines;
   }
 
+  /* Bubble text changes only every 6 s — measure each distinct line once. */
+  var bubbleCache = { key: null, maxW: -1, font: '', lines: null };
+  var overheardCache = { key: null, maxW: -1, font: '', lines: null };
+  function wrapCached(ctx, text, maxW, maxLines, font, cache) {
+    if (cache.key !== text || cache.maxW !== maxW || cache.font !== font) {
+      cache.key = text;
+      cache.maxW = maxW;
+      cache.font = font;
+      ctx.font = font;
+      cache.lines = wrapText(ctx, text, maxW, maxLines);
+    }
+    return cache.lines;
+  }
+
   function drawBubble(ctx, x, y, text) {
-    ctx.font = '12px "Segoe UI",Verdana,sans-serif';
-    var lines = wrapText(ctx, text, 148, 3);
+    var f = '12px "Segoe UI",Verdana,sans-serif';
+    var lines = wrapCached(ctx, text, 148, 3, f, bubbleCache);
+    ctx.font = f;
     var w = 0;
     for (var i = 0; i < lines.length; i++) w = Math.max(w, ctx.measureText(lines[i]).width);
     w += 16;
@@ -695,9 +785,10 @@ window.WNpcs = (function () {
     var spk = byId(line.sp);
     var pp = (window.WWorld && WWorld.poi) ? WWorld.poi[s.pair.poi] : null;
     if (!spk || !pp) return;
-    ctx.font = '13px "Segoe UI",Verdana,sans-serif';
+    var f = '13px "Segoe UI",Verdana,sans-serif';
     var text = spk.def.name.split(' ')[0] + ': \u201c' + line.text + '\u201d';
-    var lines = wrapText(ctx, text, 240, 3);
+    var lines = wrapCached(ctx, text, 240, 3, f, overheardCache);
+    ctx.font = f;
     var w = 0;
     for (var i = 0; i < lines.length; i++) w = Math.max(w, ctx.measureText(lines[i]).width);
     w += 20;
@@ -723,6 +814,7 @@ window.WNpcs = (function () {
     var player = env && env.player;
     for (var i = 0; i < list.length; i++) {
       var n = list[i];
+      if (n.hidden) continue;
       if (n.bubble && n.bubble.t > 0) drawBubble(ctx, n.x, n.y, n.bubble.text);
     }
     if (player) {

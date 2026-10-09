@@ -112,7 +112,125 @@
     return 'rgba(' + (c[0] | 0) + ',' + (c[1] | 0) + ',' + (c[2] | 0) + ',' + a + ')';
   };
 
-  /* ---- storage: never throws (file:// may block localStorage) ---- */
+  /* ---- shared vector UI kit ----
+   The ui.png atlas panels clash with the game's warm palette, so every
+   screen draws panels/chips from here: one coherent parchment-on-dusk look,
+   independent of the atlas. Pure draw calls; no game layers touched. */
+
+var UI_GOLD = 'rgba(240,200,130,';
+var UI_CREAM = 'rgba(242,234,216,';
+
+function uiPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+/* Dusk panel: soft shadow, warm gradient, gold hairline, inner highlight. */
+WU.panel = function (ctx, x, y, w, h, opts) {
+  opts = opts || {};
+  var r = opts.radius !== undefined ? opts.radius : 10;
+  var a = opts.alpha !== undefined ? opts.alpha : 0.94;
+
+  /* drop shadow (cheap: one offset translucent pass) */
+  ctx.fillStyle = 'rgba(0,0,0,0.30)';
+  uiPath(ctx, x - 1, y + 2, w + 2, h + 3, r + 1);
+  ctx.fill();
+
+  /* body */
+  var g = ctx.createLinearGradient(0, y, 0, y + h);
+  g.addColorStop(0, 'rgba(43,40,54,' + a + ')');
+  g.addColorStop(1, 'rgba(22,20,30,' + Math.min(1, a + 0.04) + ')');
+  ctx.fillStyle = g;
+  uiPath(ctx, x, y, w, h, r);
+  ctx.fill();
+
+  /* gold hairline + inner highlight */
+  ctx.strokeStyle = UI_GOLD + '0.55)';
+  ctx.lineWidth = 1.5;
+  uiPath(ctx, x, y, w, h, r);
+  ctx.stroke();
+  ctx.strokeStyle = UI_CREAM + '0.09)';
+  ctx.lineWidth = 1;
+  uiPath(ctx, x + 2.5, y + 2.5, w - 5, h - 5, Math.max(2, r - 3));
+  ctx.stroke();
+
+  if (opts.accent) {
+    /* gold accent bar (quest cards, toasts) */
+    ctx.fillStyle = UI_GOLD + '0.9)';
+    uiPath(ctx, x + 4, y + 6, 3, h - 12, 1.5);
+    ctx.fill();
+  }
+};
+
+/* Small keyboard key cap (Q, F, E, Tab…) with a pressed-look bottom bevel.
+   Width grows for multi-letter labels ("Tab"); returns the cap width. */
+WU.keycapW = function (s, label) {
+  return Math.max(s, String(label).length * s * 0.48 * 0.62 + 12);
+};
+
+WU.keycap = function (ctx, x, y, s, label) {
+  var w = WU.keycapW(s, label);
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  uiPath(ctx, x, y + 1.5, w, s, 5);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(66,62,78,0.98)';
+  uiPath(ctx, x, y, w, s - 1.5, 5);
+  ctx.fill();
+  ctx.strokeStyle = UI_GOLD + '0.55)';
+  ctx.lineWidth = 1;
+  uiPath(ctx, x + 0.5, y + 0.5, w - 1, s - 2.5, 4.5);
+  ctx.stroke();
+  ctx.fillStyle = '#ffe9b8';
+  ctx.font = 'bold ' + Math.round(s * 0.48) + 'px "Segoe UI",Verdana,sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(label, x + w / 2, y + s * 0.62);
+  return w;
+};
+
+/* Round item token for inventory fallbacks: deterministic hue + kind ring. */
+WU.gemToken = function (ctx, x, y, r, hue) {
+  var g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.35, r * 0.2, x, y, r);
+  g.addColorStop(0, 'hsl(' + hue + ',45%,62%)');
+  g.addColorStop(1, 'hsl(' + hue + ',38%,38%)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, WU.TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,240,210,0.35)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, WU.TAU); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.beginPath(); ctx.arc(x - r * 0.3, y - r * 0.35, r * 0.22, 0, WU.TAU); ctx.fill();
+};
+
+/* Weather glyph: sun / rain / moon, drawn to match the HUD's palette. */
+WU.weatherGlyph = function (ctx, kind, x, y, s) {
+  var i;
+  if (kind === 'rain') {
+    ctx.fillStyle = 'rgba(150,190,214,0.95)';
+    for (i = 0; i < 3; i++) ctx.fillRect(x + i * (s * 0.38), y + s * 0.45 + (i % 2) * s * 0.18, Math.max(1, s * 0.1), s * 0.4);
+    ctx.fillStyle = 'rgba(200,214,226,0.9)';
+    ctx.beginPath();
+    ctx.arc(x + s * 0.3, y + s * 0.25, s * 0.28, Math.PI, 0);
+    ctx.arc(x + s * 0.65, y + s * 0.25, s * 0.34, Math.PI * 0.9, 0);
+    ctx.closePath(); ctx.fill();
+  } else if (kind === 'night') {
+    ctx.fillStyle = '#cfd8ee';
+    ctx.beginPath();
+    ctx.arc(x + s * 0.5, y + s * 0.5, s * 0.42, Math.PI * 0.32, Math.PI * 1.68);
+    ctx.arc(x + s * 0.78, y + s * 0.36, s * 0.34, Math.PI * 1.5, Math.PI * 0.55, true);
+    ctx.closePath(); ctx.fill();
+  } else {
+    ctx.fillStyle = '#ffd98a';
+    ctx.beginPath(); ctx.arc(x + s * 0.5, y + s * 0.5, s * 0.3, 0, WU.TAU); ctx.fill();
+    for (i = 0; i < 8; i++) {
+      var an = (i / 8) * WU.TAU;
+      ctx.fillRect(x + s * 0.5 + Math.cos(an) * s * 0.44 - 0.75,
+                   y + s * 0.5 + Math.sin(an) * s * 0.44 - 0.75, 1.5, 1.5);
+    }
+  }
+};
+
+/* ---- storage: never throws (file:// may block localStorage) ---- */
 
   WU.save = function (key, obj) {
     try {

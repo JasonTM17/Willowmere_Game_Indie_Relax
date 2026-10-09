@@ -234,7 +234,8 @@
         break;
       }
       case 'footstep':
-        noise(0.05, 0.04, 500); break;
+        /* slight per-step pitch spread so a walk does not sound metronomic */
+        noise(0.05, 0.04, 420 + Math.random() * 260); break;
       case 'vista':
         tone(262, 262, 0.9, 'sine', 0.08);
         tone(330, 330, 0.9, 'sine', 0.07, 0.05);

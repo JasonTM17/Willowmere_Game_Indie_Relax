@@ -34,18 +34,25 @@ window.WHUD = (function () {
     old_stone_circle: 'Old Stone Circle'
   };
 
-  /* ui.png critter / fish mini order (matches WAction registry order) */
-  var CRITTER_ROW = 5, FISH_ROW = 6, ITEM_ROW = 4;
-  var CRIT_ORDER = ['critter_butterfly', 'critter_cricket', 'critter_oak_beetle',
-    'critter_firefly', 'critter_luna_moth', 'critter_dragonfly', 'critter_mayfly',
-    'critter_sand_crab', 'critter_glow_worm', 'critter_grasshopper'];
-  var FISH_ORDER = ['fish_minnow', 'fish_perch', 'fish_flounder',
-    'fish_trout', 'fish_carp', 'fish_moonfish'];
+  /* ui.png atlas rows (160×112 sheet): hearts/tools/weather row 4,
+     item icons row 5. Critter/fish cells hold unrelated sprites (chickens,
+     honey pots) in this pack, so those kinds always draw vector tokens. */
+  var ITEM_ROW = 5;
+
+  function itemCell(key) {
+    var A = window.WAction;
+    if (!A || !A.ITEMS[key]) return null;
+    if (A.ITEMS[key].kind === 'critter' || A.ITEMS[key].kind === 'fish') return null;
+    return A.ITEM_UI_COL.hasOwnProperty(key) ? [A.ITEM_UI_COL[key], ITEM_ROW] : null;
+  }
 
   function font(size, bold, italic) {
     return (bold ? 'bold ' : '') + (italic ? 'italic ' : '') +
       size + 'px "Segoe UI",Verdana,sans-serif';
   }
+
+  /* cream with alpha — HUD text lives on this tone */
+  function cream(a) { return 'rgba(242,234,216,' + a + ')'; }
 
   /* Backing-store DPR as built by WGame (devicePixelRatio alone is wrong
      where main clamps it, e.g. to 2). */
@@ -70,8 +77,9 @@ window.WHUD = (function () {
 
   /* ---- toasts / prompt ---- */
   function toast(text, ms) {
+    var t = ms || 2600;
     if (toasts.length >= 3) toasts.shift();
-    toasts.push({ text: String(text).slice(0, 120), t: ms || 2600 });
+    toasts.push({ text: String(text).slice(0, 120), t: t, total: t });
   }
 
   function promptAt(text, x, y, cam) {
@@ -83,54 +91,66 @@ window.WHUD = (function () {
     };
   }
 
-  /* ---- primitives ---- */
+  /* ---- primitives ----
+     Panels are drawn by the shared WU vector kit (util.js): the ui.png
+     9-slice sat on atlas cells that hold critter icons, so it smeared
+     blue rectangles and heart shards across every chip. The atlas is still
+     used for the few sprites it does carry (hearts, item icons). */
+
   function hasUi() { return !!(window.WAssets && WAssets.has('ui')); }
 
-  function panel(ctx, x, y, w, h) {
-    if (hasUi()) {
-      var s = 16, ix = 0, iy = 16;
-      var x2 = x + w - s, y2 = y + h - s;
-      WAssets.sheet(ctx, 'ui', ix, iy, s, s, x, y, s, s);
-      WAssets.sheet(ctx, 'ui', ix + 2 * s, iy, s, s, x2, y, s, s);
-      WAssets.sheet(ctx, 'ui', ix, iy + 2 * s, s, s, x, y2, s, s);
-      WAssets.sheet(ctx, 'ui', ix + 2 * s, iy + 2 * s, s, s, x2, y2, s, s);
-      WAssets.sheet(ctx, 'ui', ix + s, iy, s, s, x + s, y, w - 2 * s, s);
-      WAssets.sheet(ctx, 'ui', ix + s, iy + 2 * s, s, s, x + s, y2, w - 2 * s, s);
-      WAssets.sheet(ctx, 'ui', ix, iy + s, s, s, x, y + s, s, h - 2 * s);
-      WAssets.sheet(ctx, 'ui', ix + 2 * s, iy + s, s, s, x2, y + s, s, h - 2 * s);
-      WAssets.sheet(ctx, 'ui', ix + s, iy + s, s, s, x + s, y + s, w - 2 * s, h - 2 * s);
-      return;
-    }
-    ctx.fillStyle = 'rgba(22,26,36,0.88)';
-    ctx.strokeStyle = 'rgba(255,232,180,0.4)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(x, y, w, h, 10);
-    else ctx.rect(x, y, w, h);
-    ctx.fill();
-    ctx.stroke();
+  function panel(ctx, x, y, w, h, opts) {
+    WU.panel(ctx, x, y, w, h, opts);
   }
 
-  function icon(ctx, col, row, x, y, s) {
-    if (!hasUi()) return false;
-    WAssets.sheet(ctx, 'ui', col * 16, row * 16, 16, 16, x, y, s || 16, s || 16);
-    return true;
+  /* ui.png keeps real hearts at row 4 (full col 0, empty col 1) */
+  function heart(ctx, x, y, s, full) {
+    if (hasUi()) {
+      WAssets.sheet(ctx, 'ui', (full ? 0 : 1) * 16, 4 * 16, 16, 16, x, y, s, s);
+      return;
+    }
+    ctx.font = Math.round(s) + 'px "Segoe UI",Verdana,sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = full ? '#ff6c96' : 'rgba(255,255,255,0.18)';
+    ctx.fillText('\u2665', x, y + s);
   }
 
   function button(ctx, label, x, y, w, h, selected, dim, id) {
     buttons.push({ id: id, x: x, y: y, w: w, h: h });
-    ctx.fillStyle = selected ? 'rgba(255,214,130,0.2)' : 'rgba(255,255,255,0.05)';
+    var g = ctx.createLinearGradient(0, y, 0, y + h);
+    if (selected) {
+      g.addColorStop(0, 'rgba(255,214,130,0.28)');
+      g.addColorStop(1, 'rgba(214,160,80,0.16)');
+    } else {
+      g.addColorStop(0, 'rgba(255,255,255,0.08)');
+      g.addColorStop(1, 'rgba(255,255,255,0.03)');
+    }
+    ctx.fillStyle = g;
     ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(x, y, w, h, 8);
+    if (ctx.roundRect) ctx.roundRect(x, y, w, h, h / 2);
     else ctx.rect(x, y, w, h);
     ctx.fill();
-    ctx.strokeStyle = selected ? 'rgba(255,214,130,0.9)' : 'rgba(255,255,255,0.22)';
+    ctx.strokeStyle = selected ? 'rgba(255,214,130,0.95)' : 'rgba(255,255,255,0.25)';
     ctx.lineWidth = selected ? 2 : 1;
-    ctx.stroke();
+    if (selected) {
+      ctx.save();
+      ctx.shadowColor = 'rgba(255,214,130,0.55)';
+      ctx.shadowBlur = 12;
+      ctx.stroke();
+      ctx.restore();
+    } else {
+      ctx.stroke();
+    }
     ctx.font = font(16, selected);
     ctx.textAlign = 'center';
-    ctx.fillStyle = dim ? 'rgba(210,200,180,0.4)' : (selected ? '#ffd98a' : '#f2ead8');
+    ctx.fillStyle = dim ? cream(0.4) : (selected ? '#ffd98a' : '#f2ead8');
     ctx.fillText(label, x + w / 2, y + h / 2 + 6);
+    if (selected && !dim) {
+      ctx.fillStyle = '#ffd98a';
+      var bob = Math.sin(performance.now() * 0.005) * 1.5;
+      ctx.fillText('\u25c6', x + 20, y + h / 2 + 6 + bob);
+      ctx.fillText('\u25c6', x + w - 20, y + h / 2 + 6 + bob);
+    }
   }
 
   /* ---- read-only lookups ---- */
@@ -241,21 +261,6 @@ window.WHUD = (function () {
   }
 
   /* ---- pouch (bag) ---- */
-  function itemCell(key) {
-    var A = window.WAction;
-    if (!A || !A.ITEMS[key]) return null;
-    var kind = A.ITEMS[key].kind, ci, fi;
-    if (kind === 'critter') {
-      ci = CRIT_ORDER.indexOf(key);
-      return ci >= 0 ? [ci, CRITTER_ROW] : null;
-    }
-    if (kind === 'fish') {
-      fi = FISH_ORDER.indexOf(key);
-      return fi >= 0 ? [fi, FISH_ROW] : null;
-    }
-    return A.ITEM_UI_COL.hasOwnProperty(key) ? [A.ITEM_UI_COL[key], ITEM_ROW] : null;
-  }
-
   function drawBag(ctx, vw, vh) {
     var A = window.WAction;
     var keys = (A && A.list) ? A.list() : [];
@@ -269,27 +274,52 @@ window.WHUD = (function () {
     panel(ctx, x, y, w, h);
 
     ctx.textAlign = 'center';
-    ctx.font = 'italic 19px Georgia,serif';
+    ctx.font = 'italic 20px Georgia,serif';
     ctx.fillStyle = '#f6ecd2';
-    ctx.fillText('Pouch', vw / 2, y + 28);
+    ctx.fillText('Pouch', vw / 2, y + 30);
+    /* gold flourish under the title */
+    ctx.strokeStyle = 'rgba(240,200,130,0.5)';
+    ctx.lineWidth = 1;
+    var fl = 46;
+    ctx.beginPath();
+    ctx.moveTo(vw / 2 - fl, y + 40);
+    ctx.lineTo(vw / 2 - 8, y + 40);
+    ctx.moveTo(vw / 2 + 8, y + 40);
+    ctx.lineTo(vw / 2 + fl, y + 40);
+    ctx.stroke();
+    ctx.fillStyle = '#ffd98a';
+    ctx.fillRect(vw / 2 - 2.5, y + 37.5, 5, 5);
+    ctx.save();
+    ctx.translate(vw / 2, y + 40);
+    ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = 'rgba(22,20,30,1)';
+    ctx.fillRect(-3, -3, 6, 6);
+    ctx.restore();
     ctx.font = font(11);
-    ctx.fillStyle = 'rgba(242,234,216,0.6)';
-    ctx.fillText(keys.length + ' of ' + (BAG_COLS * BAG_ROWS) + ' slots', vw / 2, y + 44);
+    ctx.fillStyle = cream(0.6);
+    ctx.fillText(keys.length + ' of ' + (BAG_COLS * BAG_ROWS) + ' slots', vw / 2, y + 54);
 
     ctx.textAlign = 'left';
     for (var r = 0; r < BAG_ROWS; r++) {
       for (var c = 0; c < BAG_COLS; c++) {
         var i = r * BAG_COLS + c;
         var sx = x + 18 + c * (BAG_SLOT + BAG_GAP);
-        var sy = y + 56 + r * (BAG_SLOT + BAG_GAP);
+        var sy = y + 64 + r * (BAG_SLOT + BAG_GAP);
         var key = keys[i] || null;
-        ctx.fillStyle = key ? 'rgba(255,244,214,0.10)' : 'rgba(255,255,255,0.04)';
-        ctx.strokeStyle = key ? 'rgba(255,232,180,0.45)' : 'rgba(255,255,255,0.12)';
-        ctx.lineWidth = 1;
+        /* inset well: darker fill, soft inner shading, hairline rim */
+        ctx.fillStyle = key ? 'rgba(255,244,214,0.10)' : 'rgba(0,0,0,0.22)';
         ctx.beginPath();
-        if (ctx.roundRect) ctx.roundRect(sx, sy, BAG_SLOT, BAG_SLOT, 7);
+        if (ctx.roundRect) ctx.roundRect(sx, sy, BAG_SLOT, BAG_SLOT, 8);
         else ctx.rect(sx, sy, BAG_SLOT, BAG_SLOT);
         ctx.fill();
+        ctx.strokeStyle = key ? 'rgba(255,232,180,0.55)' : 'rgba(255,255,255,0.10)';
+        ctx.lineWidth = key ? 1.5 : 1;
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(sx + 1.5, sy + 1.5, BAG_SLOT - 3, BAG_SLOT - 3, 6.5);
+        else ctx.rect(sx + 1.5, sy + 1.5, BAG_SLOT - 3, BAG_SLOT - 3);
         ctx.stroke();
         if (key) {
           var cell = itemCell(key);
@@ -300,20 +330,32 @@ window.WHUD = (function () {
             drawn = true;
           }
           if (!drawn) {
-            /* vector fallback: tinted token */
-            ctx.fillStyle = '#cfc0a0';
-            ctx.beginPath(); ctx.arc(sx + 21, sy + 17, 8, 0, WU.TAU); ctx.fill();
+            /* vector fallback: kind-tinted gem token */
+            WU.gemToken(ctx, sx + 21, sy + 17, 9, Math.abs(WAssets.keyHue(key)) % 360);
           }
+          /* count badge */
+          var cnt = '\u00d7' + A.count(key);
           ctx.font = font(11, true);
+          var bw = ctx.measureText(cnt).width + 8;
+          ctx.fillStyle = 'rgba(12,10,16,0.85)';
+          ctx.beginPath();
+          if (ctx.roundRect) ctx.roundRect(sx + BAG_SLOT - bw - 3, sy + BAG_SLOT - 16, bw, 13, 6);
+          else ctx.rect(sx + BAG_SLOT - bw - 3, sy + BAG_SLOT - 16, bw, 13);
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(255,232,180,0.35)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
           ctx.fillStyle = '#ffe9b8';
-          ctx.fillText('\u00d7' + A.count(key), sx + 6, sy + BAG_SLOT - 6);
+          ctx.textAlign = 'center';
+          ctx.fillText(cnt, sx + BAG_SLOT - 3 - bw / 2, sy + BAG_SLOT - 6);
+          ctx.textAlign = 'left';
         }
       }
     }
 
     ctx.textAlign = 'center';
     ctx.font = font(11, false, true);
-    ctx.fillStyle = 'rgba(242,234,216,0.55)';
+    ctx.fillStyle = cream(0.55);
     ctx.fillText('Tab \u2014 close', vw / 2, y + h - 16);
   }
 
@@ -334,37 +376,36 @@ window.WHUD = (function () {
     questTransitions();
     rainWatch(env);
 
-    /* clock chip */
+    /* clock chip — warm pill, gold hour, vector weather glyph */
     var time = WU.fmtHour(h);
-    var label = 'Day ' + (env && env.day ? env.day : 1) + ' \u00b7 ' + time;
+    var dayTxt = 'Day ' + (env && env.day ? env.day : 1);
     ctx.font = font(13, true);
-    var cw = ctx.measureText(label).width + 46;
-    var cx = vw / 2 - cw / 2;
-    panel(ctx, cx, 12, cw, 28);
-    ctx.fillStyle = '#f2ead8';
+    var hourTxt = time;
+    var cw = ctx.measureText(dayTxt).width + ctx.measureText(hourTxt).width + 58;
+    var cx = Math.round(vw / 2 - cw / 2);
+    panel(ctx, cx, 12, cw, 30, { radius: 15, alpha: 0.88 });
     ctx.textAlign = 'left';
-    ctx.fillText(label, cx + 12, 31);
+    ctx.fillStyle = cream(0.92);
+    ctx.fillText(dayTxt, cx + 14, 31);
+    var dayW = ctx.measureText(dayTxt).width;
+    ctx.fillStyle = '#ffd98a';
+    ctx.fillText(hourTxt, cx + 14 + dayW + 16, 31);
+    ctx.fillStyle = 'rgba(240,200,130,0.45)';
+    ctx.fillRect(cx + 14 + dayW + 6, 23, 2, 8);
     var night = h >= 20 || h < 5;
     var weather = env && env.weather ? env.weather : 'clear';
-    var ic = night ? [8, 0] : (weather === 'rain' ? [7, 0] : [6, 0]);
-    if (!icon(ctx, ic[0], ic[1], cx + cw - 24, 18)) {
-      ctx.fillStyle = weather === 'rain' ? '#9fc4d4' : night ? '#cfd8ee' : '#ffd98a';
-      ctx.beginPath(); ctx.arc(cx + cw - 18, 26, 5, 0, WU.TAU); ctx.fill();
-      if (night) ctx.fillRect(cx + cw - 22, 18, 1, 2);
-    }
+    var gl = night ? 'night' : (weather === 'rain' ? 'rain' : 'sun');
+    WU.weatherGlyph(ctx, gl, cx + cw - 22, 19, 12);
 
     /* rain forecast chip: rain is rolled at 06:00 for the whole day */
     if (weather !== 'rain' && rainTomorrow(env)) {
       ctx.font = font(11, true);
-      var fw = ctx.measureText('Rain tomorrow').width + 42;
-      var fx = vw / 2 - fw / 2;
-      panel(ctx, fx, 44, fw, 22);
-      if (!icon(ctx, 7, 0, fx + 8, 48)) {
-        ctx.fillStyle = '#9fc4d4';
-        for (var di = 0; di < 3; di++) ctx.fillRect(fx + 9 + di * 4, 48 + (di % 2), 1.5, 7);
-      }
+      var fw = ctx.measureText('Rain tomorrow').width + 40;
+      var fx = Math.round(vw / 2 - fw / 2);
+      panel(ctx, fx, 48, fw, 22, { radius: 11, alpha: 0.85 });
+      WU.weatherGlyph(ctx, 'rain', fx + 9, 52, 11);
       ctx.fillStyle = '#c8dcea';
-      ctx.fillText('Rain tomorrow', fx + 28, 59);
+      ctx.fillText('Rain tomorrow', fx + 26, 63);
     }
 
     /* quest panel: active quests (with current step), then available */
@@ -378,84 +419,97 @@ window.WHUD = (function () {
         return av - bv;
       });
       var shown = 0;
-      var py = weather !== 'rain' && rainTomorrow(env) ? 74 : 56;
+      var py = weather !== 'rain' && rainTomorrow(env) ? 78 : 56;
       ctx.textAlign = 'left';
       for (var i = 0; i < qs.length && shown < 3; i++) {
         var q = qs[i];
         if (q.state !== 'active' && q.state !== 'available') continue;
-        var mark = q.state === 'active' ? '\u25cf ' : '\u25cb ';
-        var title = mark + q.title;
+        var title = q.title;
         var step = questStep(q);
         ctx.font = font(13, true);
         var tw = Math.max(ctx.measureText(title).width, 210);
         ctx.font = font(11);
         tw = Math.max(tw, Math.min(260, ctx.measureText(step).width + 10));
-        var pw = Math.min(300, tw + 24);
-        panel(ctx, 12, py, pw, 46);
+        var pw = Math.min(300, tw + 30);
+        panel(ctx, 12, py, pw, 46, { accent: q.state === 'active' });
+        /* status glyph: filled diamond for active, hollow for available */
+        if (q.state === 'active') {
+          ctx.save();
+          ctx.translate(22, py + 13);
+          ctx.rotate(Math.PI / 4);
+          ctx.fillStyle = '#ffd98a';
+          ctx.fillRect(-3.2, -3.2, 6.4, 6.4);
+          ctx.restore();
+        } else {
+          ctx.strokeStyle = cream(0.55);
+          ctx.lineWidth = 1.5;
+          ctx.save();
+          ctx.translate(22, py + 13);
+          ctx.rotate(Math.PI / 4);
+          ctx.strokeRect(-3.2, -3.2, 6.4, 6.4);
+          ctx.restore();
+        }
         ctx.font = font(13, true);
-        ctx.fillStyle = q.state === 'active' ? '#ffd98a' : '#e8dcc0';
-        ctx.fillText(title, 22, py + 18);
+        ctx.fillStyle = q.state === 'active' ? '#ffd98a' : cream(0.85);
+        ctx.fillText(title, 34, py + 18);
         ctx.font = font(11);
-        ctx.fillStyle = 'rgba(242,234,216,0.7)';
-        ctx.fillText(step.slice(0, 46), 22, py + 34);
+        ctx.fillStyle = cream(0.66);
+        ctx.fillText(step.slice(0, 46), 34, py + 34);
         py += 54;
         shown++;
       }
     }
 
-    /* tool chips */
-    var chips = [['Q', 2, 0, 'Net'], ['F', 3, 0, 'Rod'], ['\u25ce', 4, 0, 'Sling'],
-                 ['Tab', 5, 0, 'Bag']];
+    /* tool chips — keycap + label, sized to content */
+    var chips = [['Q', 'Net'], ['F', 'Rod'], ['\u25ce', 'Sling'], ['Tab', 'Bag']];
     var chx = vw - 12;
     ctx.textAlign = 'left';
     for (i = chips.length - 1; i >= 0; i--) {
       var c = chips[i];
+      var capW = WU.keycapW(18, c[0]);
       ctx.font = font(12, true);
-      var w = c[0] === 'Tab' ? 72 : 64;
-      chx -= w + 6;
-      panel(ctx, chx, vh - 44, w, 26);
-      if (!hasUi()) {
-        ctx.fillStyle = '#d8cfc0';
-        ctx.fillRect(chx + 8, vh - 38, 14, 14);
-      } else {
-        icon(ctx, c[1], c[2], chx + 8, vh - 39);
-      }
-      ctx.fillStyle = '#f2ead8';
-      ctx.font = font(11, true);
-      ctx.fillText(c[0] + ' ' + c[3], chx + 27, vh - 27);
+      var w = Math.round(7 + capW + 8 + ctx.measureText(c[1]).width + 10);
+      chx -= w + 8;
+      panel(ctx, chx, vh - 46, w, 28, { radius: 14, alpha: 0.85 });
+      WU.keycap(ctx, chx + 7, vh - 41, 18, c[0]);
+      ctx.fillStyle = cream(0.9);
+      ctx.font = font(12, true);
+      ctx.fillText(c[1], chx + 7 + capW + 8, vh - 27);
     }
 
-    /* toasts */
-    var ty = vh - 66;
+    /* toasts (soft entrance: 180 ms fade + slide, soft exit over the tail) */
+    var ty = vh - 68;
     for (i = toasts.length - 1; i >= 0; i--) {
       var t = toasts[i];
       t.t -= dt;
       if (t.t <= 0) { toasts.splice(i, 1); continue; }
       ctx.font = font(13);
-      var twd = ctx.measureText(t.text).width + 28;
-      var a = Math.min(1, t.t / 400);
+      var twd = ctx.measureText(t.text).width + 34;
+      var age = t.total - t.t;
+      var aIn = Math.min(1, age / 180);
+      var a = Math.min(aIn, t.t / 400);
       ctx.globalAlpha = a;
-      panel(ctx, vw / 2 - twd / 2, ty - 24, twd, 30);
+      var dy = (1 - aIn) * 6;
+      panel(ctx, vw / 2 - twd / 2, ty - 26 + dy, twd, 30, { radius: 15, accent: true });
       ctx.fillStyle = '#f6eeda';
       ctx.textAlign = 'center';
-      ctx.fillText(t.text, vw / 2, ty - 4);
+      ctx.fillText(t.text, vw / 2 + 3, ty - 6 + dy);
       ctx.globalAlpha = 1;
-      ty -= 36;
+      ty -= 38;
     }
 
-    /* interaction prompt: "E \u2014 \u2026" over the nearest target */
+    /* interaction prompt: "E — …" over the nearest target, gentle bob */
     if (prompt) {
-      ctx.font = font(13, true);
-      var pw2 = ctx.measureText(prompt.text).width + 42;
-      var px = WU.clamp(prompt.x - pw2 / 2, 8, vw - pw2 - 8);
-      var pyy = WU.clamp(prompt.y - 40, 40, vh - 80);
-      panel(ctx, px, pyy, pw2, 26);
-      ctx.fillStyle = '#ffd98a';
-      ctx.textAlign = 'center';
-      ctx.fillText('E', px + 16, pyy + 18);
-      ctx.fillStyle = '#f6eeda';
+      var bob2 = Math.sin(performance.now() * 0.006) * 1.5;
       ctx.font = font(13);
-      ctx.fillText(prompt.text, px + 30 + (pw2 - 42) / 2, pyy + 18);
+      var pw2 = ctx.measureText(prompt.text).width + 52;
+      var px = WU.clamp(prompt.x - pw2 / 2, 8, vw - pw2 - 8);
+      var pyy = WU.clamp(prompt.y - 40, 40, vh - 80) + bob2;
+      panel(ctx, px, pyy, pw2, 28, { radius: 14, alpha: 0.9 });
+      WU.keycap(ctx, px + 7, pyy + 5, 18, 'E');
+      ctx.fillStyle = '#f6eeda';
+      ctx.textAlign = 'center';
+      ctx.fillText(prompt.text, px + 30 + (pw2 - 36) / 2, pyy + 19);
       prompt = null; // one frame per set
     }
 
@@ -470,22 +524,54 @@ window.WHUD = (function () {
 
     /* vignette */
     var g = ctx.createLinearGradient(0, 0, 0, vh);
-    g.addColorStop(0, 'rgba(10,14,22,0.55)');
-    g.addColorStop(0.45, 'rgba(10,14,22,0.12)');
-    g.addColorStop(1, 'rgba(10,14,22,0.65)');
+    g.addColorStop(0, 'rgba(10,14,22,0.6)');
+    g.addColorStop(0.42, 'rgba(10,14,22,0.14)');
+    g.addColorStop(1, 'rgba(10,14,22,0.7)');
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, vw, vh);
 
-    /* logo */
+    var ly = vh * 0.24;
+
+    /* soft radial glow behind the logo */
+    var glow = ctx.createRadialGradient(vw / 2, ly, 20, vw / 2, ly, vw * 0.34);
+    var pulse = 0.10 + 0.04 * Math.sin(performance.now() * 0.0012);
+    glow.addColorStop(0, 'rgba(255,214,130,' + pulse.toFixed(3) + ')');
+    glow.addColorStop(1, 'rgba(255,214,130,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, vw, vh);
+
+    /* logo: letter-spaced serif, cream-to-gold gradient over a soft shadow */
+    var spaced = 'WILLOWMERE'.split('').join('\u2009');
     ctx.textAlign = 'center';
-    ctx.font = 'italic 700 58px Georgia,"Times New Roman",serif';
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillText('WILLOWMERE', vw / 2 + 3, vh * 0.26 + 3);
-    ctx.fillStyle = '#f6ecd2';
-    ctx.fillText('WILLOWMERE', vw / 2, vh * 0.26);
-    ctx.font = 'italic 17px Georgia,serif';
-    ctx.fillStyle = 'rgba(246,236,210,0.85)';
-    ctx.fillText('a small light, kept together', vw / 2, vh * 0.26 + 34);
+    ctx.font = 'italic 700 56px Georgia,"Times New Roman",serif';
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillText(spaced, vw / 2 + 3, ly + 4);
+    var lg = ctx.createLinearGradient(0, ly - 46, 0, ly + 10);
+    lg.addColorStop(0, '#faf3df');
+    lg.addColorStop(0.55, '#f2e2b8');
+    lg.addColorStop(1, '#e6c07a');
+    ctx.fillStyle = lg;
+    ctx.fillText(spaced, vw / 2, ly);
+    ctx.font = 'italic 18px Georgia,serif';
+    ctx.fillStyle = 'rgba(246,236,210,0.9)';
+    ctx.fillText('a small light, kept together', vw / 2, ly + 34);
+
+    /* gold flourish: line — diamond — line */
+    var fy = ly + 58, half = 120;
+    ctx.strokeStyle = 'rgba(240,200,130,0.65)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(vw / 2 - half, fy); ctx.lineTo(vw / 2 - 12, fy);
+    ctx.moveTo(vw / 2 + 12, fy); ctx.lineTo(vw / 2 + half, fy);
+    ctx.stroke();
+    ctx.save();
+    ctx.translate(vw / 2, fy);
+    ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = '#ffd98a';
+    ctx.fillRect(-4, -4, 8, 8);
+    ctx.fillStyle = 'rgba(20,18,28,0.9)';
+    ctx.fillRect(-2.2, -2.2, 4.4, 4.4);
+    ctx.restore();
 
     /* menu */
     var items = [
@@ -493,15 +579,21 @@ window.WHUD = (function () {
       { id: 'continue', label: hasSave ? 'Continue' : 'Continue (no save)', dim: !hasSave },
       { id: 'settings', label: 'Settings' }
     ];
-    var bw = 240, bh = 44;
-    var by = vh * 0.56;
+    var bw = 264, bh = 46;
+    var by = vh * 0.55;
     for (var i = 0; i < items.length; i++) {
-      button(ctx, items[i].label, vw / 2 - bw / 2, by + i * (bh + 12), bw, bh,
+      button(ctx, items[i].label, vw / 2 - bw / 2, by + i * (bh + 14), bw, bh,
         i === sel, items[i].dim, items[i].id);
     }
+
+    /* controls hint in a quiet pill */
+    var hint = 'WASD move \u00b7 E interact \u00b7 Q net \u00b7 F rod \u00b7 click sling \u00b7 Tab pouch \u00b7 Esc pause';
     ctx.font = font(12);
-    ctx.fillStyle = 'rgba(242,234,216,0.6)';
-    ctx.fillText('WASD move \u00b7 E interact \u00b7 Q net \u00b7 F rod \u00b7 click sling \u00b7 Tab pouch \u00b7 Esc pause', vw / 2, vh - 18);
+    var hw = ctx.measureText(hint).width + 36;
+    panel(ctx, vw / 2 - hw / 2, vh - 40, hw, 26, { radius: 13, alpha: 0.7 });
+    ctx.fillStyle = cream(0.72);
+    ctx.textAlign = 'center';
+    ctx.fillText(hint, vw / 2, vh - 23);
   }
 
   /* ---- Pause ---- */
@@ -518,6 +610,17 @@ window.WHUD = (function () {
     ctx.font = 'italic 26px Georgia,serif';
     ctx.fillStyle = '#f6ecd2';
     ctx.fillText('Paused', vw / 2, y + 44);
+    ctx.strokeStyle = 'rgba(240,200,130,0.5)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(vw / 2 - 60, y + 56); ctx.lineTo(vw / 2 + 60, y + 56);
+    ctx.stroke();
+    ctx.fillStyle = '#ffd98a';
+    ctx.save();
+    ctx.translate(vw / 2, y + 56);
+    ctx.rotate(Math.PI / 4);
+    ctx.fillRect(-3, -3, 6, 6);
+    ctx.restore();
     var items = [
       { id: 'resume', label: 'Resume' },
       { id: 'save', label: 'Save' },
@@ -562,8 +665,12 @@ window.WHUD = (function () {
       if (rows[i].v !== undefined) {
         var bx = x + 130, bw2 = 170;
         for (var s = 0; s < 10; s++) {
-          ctx.fillStyle = (s < Math.round(rows[i].v * 10)) ? '#ffd98a' : 'rgba(255,255,255,0.12)';
-          ctx.fillRect(bx + s * 17, ry - 13, 13, 16);
+          var on2 = s < Math.round(rows[i].v * 10);
+          ctx.fillStyle = on2 ? '#ffd98a' : 'rgba(255,255,255,0.12)';
+          ctx.beginPath();
+          if (ctx.roundRect) ctx.roundRect(bx + s * 17, ry - 13, 13, 16, 4);
+          else ctx.rect(bx + s * 17, ry - 13, 13, 16);
+          ctx.fill();
         }
         ctx.font = font(13);
         ctx.fillStyle = 'rgba(242,234,216,0.7)';
@@ -622,26 +729,37 @@ window.WHUD = (function () {
   }
 
   /* ---- Epilogue ---- */
+  /* wrapping ~20 paragraphs with per-word measureText ran every frame of the
+     45 s scroll; the result is cached per (paragraph array, viewport width) */
+  var epiCache = { arr: null, vw: -1, items: null, total: 0 };
+
   function drawEpilogueOn(ctx, paragraphs, scrollT) {
     var vw = ctx.canvas.width / uiDpr();
     var vh = ctx.canvas.height / uiDpr();
     ctx.fillStyle = 'rgba(7,9,14,0.94)';
     ctx.fillRect(0, 0, vw, vh);
 
-    /* measure */
-    var items = [], total = 0;
-    for (var i = 0; i < paragraphs.length; i++) {
-      var p = paragraphs[i];
-      ctx.font = p.big ? 'italic 700 34px Georgia,serif' : 'italic 16px Georgia,serif';
-      var lines = wrapPara(ctx, p.text, vw * 0.66);
-      var hgt = p.big ? 60 : lines.length * 26 + 18;
-      items.push({ p: p, lines: lines, h: hgt, font: ctx.font });
-      total += hgt;
+    /* measure (cached) */
+    if (epiCache.arr !== paragraphs || epiCache.vw !== vw) {
+      epiCache.arr = paragraphs;
+      epiCache.vw = vw;
+      epiCache.items = [];
+      epiCache.total = 0;
+      for (var m = 0; m < paragraphs.length; m++) {
+        var pm = paragraphs[m];
+        ctx.font = pm.big ? 'italic 700 34px Georgia,serif' : 'italic 16px Georgia,serif';
+        var lm = wrapPara(ctx, pm.text, vw * 0.66);
+        var hm = pm.big ? 60 : lm.length * 26 + 18;
+        epiCache.items.push({ p: pm, lines: lm, h: hm, font: ctx.font });
+        epiCache.total += hm;
+      }
     }
+    var items = epiCache.items;
+    var total = epiCache.total;
     var endH = 60;
     var y = vh * 0.9 - scrollT * (total + endH);
     ctx.textAlign = 'center';
-    for (i = 0; i < items.length; i++) {
+    for (var i = 0; i < items.length; i++) {
       var it = items[i];
       if (y > -80 && y < vh + 40) {
         ctx.font = it.font;

@@ -605,10 +605,12 @@ window.WStory = (function () {
       requires: { quest: { id: 'colors', state: 'active' } },
       choices: [
         C('A firefly jar \u2014 sketch them while they glow.', {
-          requires: { items: { critter_firefly: 1 } },
+          /* §3.2: the quest body is the vistas — both outcomes need >= 4 seen */
+          requires: { items: { critter_firefly: 1 }, vistaMin: 4 },
           take: { critter_firefly: 1 }, setFlags: { junie_stays: 1 }, next: 'q_colors_done_a'
         }),
         C('Paint the dark lighthouse instead. Some colours wait.', {
+          requires: { vistaMin: 4 },
           setFlags: { junie_leaves: 1 }, next: 'q_colors_done_b'
         })
       ]
@@ -622,9 +624,10 @@ window.WStory = (function () {
       choices: [C('(Give him time.)', { setFlags: { keeper_active: 1 } })]
     });
     m.q_keeper_regret_turnin = N('marlow', '\u2026The night the lamp died, I froze. A keeper keeps. I didn\u2019t. Say something, Warden.', {
-      /* §3.2: the confession happens at the lighthouse base, 18-21; Marlow's
-         schedule already parks him there 18-23.5, so the hour gate pins the
-         scene to its time and place. */
+      /* §3.2: the confession happens at the lighthouse base, 18-21. The
+         schedule parks Marlow there 18:00-21:30 (he arrives walking ~19:20
+         from the hills), so the hour gate pins the scene to its time and
+         place. */
       requires: { quest: { id: 'keeper_regret', state: 'active' }, hour: [18, 21] },
       choices: [
         C('The village never blamed you, Marlow.', {
