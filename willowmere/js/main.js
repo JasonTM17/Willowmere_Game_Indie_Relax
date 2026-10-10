@@ -46,6 +46,7 @@ window.WGame = (function () {
   var sleepFx = { active: false, phase: 0, t: 0 };
   var faintFx = { active: false, phase: 0, t: 0 };
   var hurtFx = 0;              // red vignette seconds-left after taking a hit
+  var shakeT = 0;              // camera shake seconds-left — same trigger
   var regenT = 45;             // one heart quietly mends every 45 s of play
 
   /* ============================== BOOT ============================== */
@@ -112,6 +113,8 @@ window.WGame = (function () {
   function autoPause() {
     if (state === 'ARCADE') return;   // the iframe losing focus is normal play
     if (state === 'PLAY' || state === 'DIALOGUE' || state === 'VISTA') {
+      /* a hidden tab may never come back — keep the day it had */
+      if (document.hidden) saveGame(true);
       prePause = state === 'PAUSE' ? prePause : state;
       state = 'PAUSE';
       pauseSel = 0;
@@ -352,6 +355,7 @@ window.WGame = (function () {
       player.hp = player.maxHp;      // sleep knits everything back together
       player.invuln = 0;
       WParticles.clear();
+      if (WAction.clearEnemies) WAction.clearEnemies();   // morning is safe
       saveGame(true);
       WHUD.toast('Ngày ' + env.day + ' \u2014 06:30. ' + (env.weather === 'rain' ? 'Mưa gõ trên mái.' : 'Nắng sớm trong vắt.'));
     } else if (sleepFx.phase === 1 && sleepFx.t >= 1) {
@@ -459,6 +463,8 @@ window.WGame = (function () {
     var d = Math.sqrt(dx * dx + dy * dy) || 1;
     player.kx = dx / d * 190; player.ky = dy / d * 190; player.kt = 0.22;
     hurtFx = 0.4;
+    shakeT = 0.16;                       // the camera feels it too
+    if (window.WAction && WAction.cancelFish) WAction.cancelFish('Dây đứt mất rồi!');
     WAudio.sfx('hurt');
     if (window.WParticles) {
       WParticles.emit('floattext', player.x, player.y - 44,
@@ -493,6 +499,7 @@ window.WGame = (function () {
       WHUD.toast('Bạn tỉnh dậy trước cửa nhà \u2014 đầu còn ong ong. Những bóng đã tan.');
     } else if (faintFx.phase === 1 && faintFx.t >= 1) {
       faintFx.active = false;
+      WAction.clearEnemies && WAction.clearEnemies();   // the doorstep is safe
       env.frozen = false;
       saveGame(true);
     }
@@ -731,6 +738,7 @@ window.WGame = (function () {
       }
     }
     if (hurtFx > 0) hurtFx -= dt;
+    if (shakeT > 0) shakeT -= dt;
     clearExpiredRain();
     syncEnv();
 
@@ -753,7 +761,15 @@ window.WGame = (function () {
     }
 
     if (!sleepFx.active && !faintFx.active) {
-      if (WInput.pressed('interact')) doInteract();
+      if (WInput.pressed('interact')) {
+        /* bag open: E eats the hovered food instead of touching the world */
+        if (WHUD.bagOpen && WHUD.bagOpen()) {
+          var hk = WHUD.bagHover && WHUD.bagHover();
+          if (hk) WAction.eat(hk);
+        } else {
+          doInteract();
+        }
+      }
       if (WInput.pressed('attack')) WAction.trySwing(player);
       if (WInput.pressed('net')) {
         if (player.boat) WHUD.toast('Lưới không với được từ xuồng.');
@@ -923,6 +939,11 @@ window.WGame = (function () {
     var b = WWorld.bounds();
     cam.x = WU.clamp(cx - vw / 2, b.x, b.x + b.w - vw);
     cam.y = WU.clamp(cy - vh / 2, b.y, b.y + b.h - vh);
+    if (shakeT > 0) {          // decaying jitter — a hit you can feel
+      var sa = shakeT / 0.16;
+      cam.x += (Math.random() - 0.5) * 5 * sa;
+      cam.y += (Math.random() - 0.5) * 5 * sa;
+    }
   }
 
   function viewWH() {

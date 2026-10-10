@@ -20,6 +20,7 @@ window.WHUD = (function () {
 
   /* bag overlay (HUD-internal UI state only) — 24 slots per §5.4 */
   var bagOpen = false;
+  var bagHover = null;     // item key under the cursor while the bag is open
   var BAG_COLS = 6, BAG_ROWS = 4, BAG_SLOT = 42, BAG_GAP = 8;
 
   /* quest-state snapshot for transition toasts */
@@ -351,6 +352,38 @@ window.WHUD = (function () {
           ctx.textAlign = 'left';
         }
       }
+    }
+
+    /* hover a filled slot for its name + description; food can be eaten */
+    bagHover = null;
+    var m = window.WInput && WInput.mouse;
+    if (m && m.inside) {
+      for (var hi2 = 0; hi2 < keys.length; hi2++) {
+        var hc = hi2 % BAG_COLS, hr = (hi2 / BAG_COLS) | 0;
+        var hx = x + 18 + hc * (BAG_SLOT + BAG_GAP);
+        var hy = y + 64 + hr * (BAG_SLOT + BAG_GAP);
+        if (m.x >= hx && m.x < hx + BAG_SLOT && m.y >= hy && m.y < hy + BAG_SLOT) {
+          bagHover = keys[hi2];
+          ctx.strokeStyle = 'rgba(255,232,180,0.9)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          if (ctx.roundRect) ctx.roundRect(hx, hy, BAG_SLOT, BAG_SLOT, 8);
+          else ctx.rect(hx, hy, BAG_SLOT, BAG_SLOT);
+          ctx.stroke();
+          break;
+        }
+      }
+    }
+    if (bagHover) {
+      var it = A.ITEMS[bagHover];
+      var edible = it.kind === 'food';
+      var tip = it.name + ' \u2014 ' + it.desc + (edible ? '  E \u2014 \u0103n \u00b7 +1 tim' : '');
+      ctx.font = font(11);
+      var tw = ctx.measureText(tip).width + 26;
+      panel(ctx, vw / 2 - tw / 2, y + h - 52, tw, 24, { radius: 12, alpha: 0.9 });
+      ctx.fillStyle = edible ? '#ffe9b8' : cream(0.85);
+      ctx.textAlign = 'center';
+      ctx.fillText(tip, vw / 2, y + h - 36);
     }
 
     ctx.textAlign = 'center';
@@ -833,6 +866,7 @@ window.WHUD = (function () {
       lastWeather = null;
       bagOpen = false;
     },
-    bagOpen: function () { return bagOpen; }
+    bagOpen: function () { return bagOpen; },
+    bagHover: function () { return bagOpen ? bagHover : null; }
   };
 })();

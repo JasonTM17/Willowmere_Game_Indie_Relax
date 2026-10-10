@@ -335,6 +335,53 @@ function main() {
     if (WDialogue.active()) throw new Error('WDialogue still active after close()');
   });
 
+  /* ---- combat FSM: spawn, telegraphed strike, interrupt, dawn dissolve ----
+     hurtPlayer no-ops in TITLE state, so assertions stay on enemy internals */
+  step('combat FSM (wind-up -> hit interrupt -> dawn despawn)', function () {
+    if (typeof WAction.spawnEnemyFor !== 'function') {
+      throw new Error('WAction.spawnEnemyFor missing');
+    }
+    if (typeof WAction.clearEnemies !== 'function') {
+      throw new Error('WAction.clearEnemies missing');
+    }
+    WAction.clearEnemies();
+    var e = WAction.spawnEnemyFor('wisp', player.x + 16, player.y);
+    if (!e) throw new Error('spawnEnemyFor returned null');
+    if (WAction.enemies().length !== 1) throw new Error('enemies().length !== 1');
+
+    var envN = { day: 1, hour: 23, weather: 'clear', night: true,
+                 frozen: false, player: player };
+    var sawWind = false;
+    for (var f = 0; f < 90 && !sawWind; f++) {
+      WAction.update(1 / 60, player, envN);
+      if (e.windT > 0) sawWind = true;
+    }
+    if (!sawWind) throw new Error('adjacent wisp never entered wind-up');
+
+    /* a landed staff hit interrupts the charge and costs the wisp 1 hp */
+    player.dir = 'right';
+    if (!WAction.trySwing(player)) throw new Error('trySwing missed an adjacent wisp');
+    if (e.windT !== 0) throw new Error('wind-up survived a landed hit');
+    if (e.hp !== 1) throw new Error('wisp hp !== 1 after one hit, got ' + e.hp);
+
+    /* daybreak frees the shadow without a fight */
+    var envD = { day: 1, hour: 10, weather: 'clear', night: false,
+                 frozen: false, player: player };
+    WAction.update(1 / 60, player, envD);
+    if (WAction.enemies().length !== 0) throw new Error('wisp survived past dawn');
+    player.dir = 'down';
+  });
+
+  step('fishing cancel + bag eat (safe calls)', function () {
+    if (typeof WAction.cancelFish !== 'function') {
+      throw new Error('WAction.cancelFish missing');
+    }
+    WAction.cancelFish();                 // idle: must be a quiet no-op
+    if (typeof WAction.eat !== 'function') throw new Error('WAction.eat missing');
+    if (WAction.eat('moonbell')) throw new Error('ate a non-food item');
+    if (WAction.eat('nothing_at_all')) throw new Error('ate nothing');
+  });
+
   /* ---- pass 2: night + rain (dark tint, light glows, rain particles) ---- */
   const env2 = { day: 2, hour: 22.5, weather: 'rain', night: true,
                  frozen: false, player: player };

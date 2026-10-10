@@ -101,6 +101,59 @@ function auditFile(file) {
   return violations;
 }
 
+/* ---- cross-file API gate -------------------------------------------------
+   Collect each module's exported keys (the `window.WX = {` literal, or the
+   final `return {` of its IIFE), then check that every `WX.prop` referenced
+   in ANY script is actually exported. Catches calls to functions that were
+   renamed or never written. */
+function exportKeysOf(src) {
+  const assign = /window\.(W[A-Z]\w*)\s*=\s*(\{|\(function)/.exec(src);
+  if (!assign) return null;
+  const wname = assign[1];
+  let start = -1;
+  /* a late `window.WX = {` literal wins (main.js assigns its object mid-IIFE);
+     otherwise the export is the last `return {` at IIFE-body depth — inner
+     `return {x}` inside exported functions would be picked by a naive
+     lastIndexOf, so depth is computed on the comment-stripped source */
+  const litRe = new RegExp('window\\.' + wname + '\\s*=\\s*\\{', 'g');
+  let m, lastLit = -1;
+  while ((m = litRe.exec(src))) lastLit = m.index;
+  if (lastLit >= 0) {
+    start = src.indexOf('{', lastLit);
+  } else {
+    const clean = stripComments(src);
+    let depth = 0, lastTop = -1;
+    for (let i = 0; i < clean.length; i++) {
+      const ch = clean[i];
+      if (ch === '{') { depth++; continue; }
+      if (ch === '}') { depth--; continue; }
+      if (ch === 'r' && depth === 1 && clean.slice(i, i + 7) === 'return ' &&
+          clean.indexOf('{', i) >= 0 &&
+          /^[ \t]*\{/.test(clean.slice(i + 7))) {
+        lastTop = clean.indexOf('{', i);
+      }
+    }
+    start = lastTop;
+  }
+  if (start < 0) return null;
+  let depth = 0, end = -1;
+  for (let i = start; i < src.length; i++) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
+  }
+  if (end < 0) return null;
+  const body = src.slice(start + 1, end);
+  const keys = new Set();
+  const re = /([A-Za-z_$][\w$]*)\s*(?::|\()/g;
+  let km;
+  while ((km = re.exec(body))) keys.add(km[1]);
+  /* live-property exports added after the literal (e.g. WDialogue.env) */
+  const dpRe = new RegExp(
+    'Object\\.defineProperty\\(window\\.' + wname + ',\\s*[\'"]([A-Za-z_$][\\w$]*)[\'"]', 'g');
+  while ((km = dpRe.exec(src))) keys.add(km[1]);
+  return keys;
+}
+
 function main() {
   let names;
   try {
@@ -123,6 +176,32 @@ function main() {
     ' file(s) in willowmere/js (contract expects 13)\n');
   for (const name of names) {
     violations.push(...auditFile(path.join(JS_DIR, name)));
+  }
+
+  /* cross-file API usage: W<Name>.<prop> must exist in the module's exports */
+  const exported = {};           // WName -> Set(keys) | null
+  const srcs = {};
+  for (const name of names) {
+    const src = fs.readFileSync(path.join(JS_DIR, name), 'utf8');
+    srcs[name] = src;
+    const m = /window\.(W[A-Z]\w*)\s*=/.exec(src);
+    if (m) exported[m[1]] = exportKeysOf(src);
+  }
+  const useRe = /\b(W[A-Z]\w*)\.([A-Za-z_$][\w$]*)/g;
+  for (const name of names) {
+    const clean = stripComments(srcs[name]);
+    let m;
+    while ((m = useRe.exec(clean))) {
+      const keys = exported[m[1]];
+      if (!keys) continue;                       // module w/o a parsed export list
+      if (!keys.has(m[2])) {
+        // locate the line for reporting
+        const upto = clean.slice(0, m.index);
+        const ln = upto.split('\n').length;
+        violations.push(path.basename(name) + ':' + ln +
+          ': uses ' + m[1] + '.' + m[2] + ' — not exported by that module');
+      }
+    }
   }
 
   if (violations.length) {

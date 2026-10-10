@@ -137,7 +137,7 @@ window.WAction = (function () {
   var critters = [];      // {id, def, x, y, wx, wy, wt, seed} — alive cap 40
   var motes = [];         // {x, y, seed} — alive cap 12
   var projs = [];         // slingshot pebbles in flight — cap 8
-  var swingT = 0;
+  var swingT = 0;         // net-swing arc timer (Q) — not the staff
   var spawnT = 1, moteT = 2;
   var lastEnv = null;
   var aim = null;         // {x,y} world point under cursor (set by main)
@@ -162,7 +162,7 @@ window.WAction = (function () {
     motes.length = 0;
     projs.length = 0;
     enemies.length = 0;
-    swingT = 0;
+    swingT = 0;                             // net arc
     weapon.swingT = 0; weapon.cd = 0; weapon.outT = 0;
     fish.state = 'idle';
   }
@@ -190,6 +190,27 @@ window.WAction = (function () {
   }
 
   function count(key) { return inventory[key] || 0; }
+
+  /* eating from the bag: food kinds give a heart back; anything else
+     just gets a polite shrug. The player object comes via lastEnv. */
+  function eat(key) {
+    var it = ITEMS[key];
+    var pl = lastEnv && lastEnv.player;
+    if (!it || it.kind !== 'food' || count(key) <= 0) return false;
+    if (!pl || pl.hp >= (pl.maxHp || 3)) {
+      if (window.WHUD) WHUD.toast('Bụng còn no lắm.');
+      return false;
+    }
+    remove(key, 1);
+    pl.hp = Math.min(pl.maxHp || 3, pl.hp + 1);
+    WAudio.sfx('gift');
+    if (window.WParticles) {
+      WParticles.emit('floattext', pl.x, pl.y - 44,
+        { text: '+1', color: 'rgba(150,235,150,1)', life: 0.8 });
+    }
+    if (window.WHUD) WHUD.toast('Ăn ' + it.name + ' — ngọt và ấm lòng.');
+    return true;
+  }
 
   function remove(key, n) {
     n = n || 1;
@@ -485,7 +506,21 @@ window.WAction = (function () {
     }
   }
 
-  function updateFish(dt) {
+  /* the line snaps back in — on damage, on wandering off, on zone changes */
+  function cancelFish(reason) {
+    if (fish.state === 'idle') return;
+    fish.state = 'idle';
+    if (reason && window.WHUD) WHUD.toast(reason);
+    if (window.WParticles) WParticles.emit('splash', fish.bx, fish.by, { vy: -50 });
+    WAudio.sfx('splash');
+  }
+
+  function updateFish(dt, player) {
+    /* wandering too far from the bobber reels the line in itself */
+    if (fish.state !== 'idle' && player &&
+        WU.dist(player.x, player.y, fish.bx, fish.by) > 76) {
+      cancelFish('Bạn đi xa quá — thu dây lại.');
+    }
     if (fish.state === 'wait') {
       fish.t -= dt;
       if (fish.t <= 0) {
@@ -609,11 +644,16 @@ window.WAction = (function () {
      slingshot pebbles both deal 1 damage with a knockback push. */
 
   var ENEMY_DEFS = {
-    wisp: { hp: 2, speed: 46, r: 9, aggro: 150, drop: 'mote' },
-    crab: { hp: 3, speed: 32, r: 10, aggro: 110, drop: 'critter_sand_crab' }
+    wisp: { hp: 2, speed: 46, r: 9, aggro: 150, drop: 'mote', hours: [20, 5] },
+    crab: { hp: 3, speed: 32, r: 10, aggro: 110, drop: 'critter_sand_crab', hours: [7, 18] }
   };
   var enemies = [];
   var enemyT = 5;
+
+  /* hour window, wrapping midnight: [20,5] means 20:00 -> 05:00 */
+  function inHours(h, win) {
+    return win[0] <= win[1] ? (h >= win[0] && h < win[1]) : (h >= win[0] || h < win[1]);
+  }
 
   /* staff state: swingT = the active arc, cd = re-swing lockout,
      outT = the stick stays drawn while foes linger nearby */
@@ -635,16 +675,15 @@ window.WAction = (function () {
 
   function spawnEnemy(px, py, env) {
     var h = WU.hnorm(env.hour);
-    var night = h >= 20 || h < 5;
     var ang = WU.rand(0, WU.TAU), d = WU.rand(430, 610);   // just past the view edge
     var x = px + Math.cos(ang) * d, y = py + Math.sin(ang) * d;
     var biome = WWorld.biomeAt((x / WWorld.TILE) | 0, (y / WWorld.TILE) | 0);
     var kind = null;
-    if (night) {
-      if (biome === 'forest' || biome === 'hills' || biome === 'headland') kind = 'wisp';
-    } else if (biome === 'beach') {
-      kind = 'crab';
-    }
+    if (inHours(h, ENEMY_DEFS.crab.hours) && biome === 'beach') kind = 'crab';
+    else if (inHours(h, ENEMY_DEFS.wisp.hours) &&
+             (biome === 'forest' || biome === 'hills' || biome === 'headland')) kind = 'wisp';
+    /* once the lamp burns, the held-back shadows are free — none return */
+    if (kind === 'wisp' && window.WStory && WStory.flag('lampLit')) return;
     if (!kind || enemies.length >= 6 || !enemyWalkable(x, y)) return;
     enemies.push(makeEnemy(kind, x, y));
   }
@@ -684,6 +723,15 @@ window.WAction = (function () {
       var e = enemies[i];
       var dp = WU.dist(e.x, e.y, player.x, player.y);
       if (dp > 640) { enemies.splice(i, 1); continue; }
+      /* out of hours: a night shadow dissolves at dawn, a crab slips
+         under the sand at dusk — a farewell, not a kill */
+      if (!inHours(WU.hnorm(env.hour), e.def.hours)) {
+        if (window.WParticles && dp < 480) {
+          WParticles.emit(e.kind === 'wisp' ? 'sparkle' : 'splash', e.x, e.y - 8, {});
+        }
+        enemies.splice(i, 1);
+        continue;
+      }
       if (e.flash > 0) e.flash -= dt;
       if (e.restT > 0) e.restT -= dt;
       if (e.kt > 0) {                             // the hit's push owns the foe
@@ -730,9 +778,16 @@ window.WAction = (function () {
         }
       } else if (e.restT <= 0 && !player.boat && dp < rr) {
         e.windT = 0.32;
+        WAudio.sfx('windup');            // hear it coming, not just see it
       }
-      /* a hostile nearby keeps the staff in hand */
-      if (dp < 220) weapon.outT = Math.max(weapon.outT, 1.2);
+      /* a hostile nearby keeps the staff in hand — and teaches J first */
+      if (dp < 220) {
+        weapon.outT = Math.max(weapon.outT, 1.2);
+        if (window.WStory && !WStory.flag('staff_hint_shown')) {
+          WStory.setFlag('staff_hint_shown', true);
+          if (window.WHUD) WHUD.toast('Có thứ gì đó đang lại gần — nhấn J để vung gậy!');
+        }
+      }
     }
     /* soft separation — foes should bump shoulders, not fuse */
     for (var a = 0; a < enemies.length; a++) {
@@ -921,7 +976,7 @@ window.WAction = (function () {
       updateMotes(dt, player, env);
       updateEnemies(dt, player, env);
     }
-    updateFish(dt);
+    updateFish(dt, player);
     if (swingT > 0) swingT -= dt;
     if (weapon.swingT > 0) weapon.swingT -= dt;
     if (weapon.cd > 0) weapon.cd -= dt;
@@ -1060,6 +1115,7 @@ window.WAction = (function () {
     reset: reset,
     add: add,
     count: count,
+    eat: eat,
     remove: remove,
     setInventory: setInventory,
     list: list,
@@ -1082,6 +1138,8 @@ window.WAction = (function () {
     gift: gift,
     setAim: function (a) { aim = a; },
     fishState: function () { return fish.state; },
+    cancelFish: cancelFish,
+    clearEnemies: function () { enemies.length = 0; },
     update: update,
     drawUnder: drawUnder,
     drawOver: drawOver

@@ -222,6 +222,8 @@
       case 'hurt':                        /* player takes a hit */
         tone(220, 110, 0.22, 'square', 0.14);
         noise(0.18, 0.10, 700); break;
+      case 'windup':                      /* a foe draws its strike back */
+        tone(160, 240, 0.20, 'sawtooth', 0.08); break;
       case 'pop':
         tone(520, 1040, 0.09, 'sine', 0.15); break;
       case 'catch':
