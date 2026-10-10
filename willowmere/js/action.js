@@ -26,6 +26,7 @@ window.WAction = (function () {
     fish_trout: { name: 'Cá hồi', desc: 'Hồ lúc chạng vạng.', kind: 'fish' },
     fish_carp: { name: 'Cá chép', desc: 'Hồ ban đêm.', kind: 'fish' },
     fish_moonfish: { name: 'Cá trăng', desc: 'Bạc đêm quý hiếm.', kind: 'fish' },
+    fish_willowking: { name: 'Cá vua liễu', desc: 'Hồ ngày mưa. Vảy rủ như cành liễu.', kind: 'fish' },
     mote: { name: 'Hạt Sáng', desc: 'Bóng liễu bị giữ lại giữa dòng trôi.', kind: 'treasure' },
     food_honeycomb: { name: 'Miếng tổ ong', desc: 'Mật rừng, vẫn còn vo ve.', kind: 'food' },
     seeds_pouch: { name: 'Túi hạt giống', desc: 'Túi vải hạt giống của Gideon.', kind: 'key' },
@@ -65,7 +66,10 @@ window.WAction = (function () {
     { id: 'fish_flounder', biome: 'sea', from: 7, to: 17, rare: false },
     { id: 'fish_trout', biome: 'lake', from: 17, to: 20, rare: false },
     { id: 'fish_carp', biome: 'lake', from: 20, to: 2, rare: false },
-    { id: 'fish_moonfish', biome: null, from: 21, to: 2, rare: true }
+    { id: 'fish_moonfish', biome: null, from: 21, to: 2, rare: true, band: 0.18 },
+    /* the Willow King only rises while it rains on the lake — the narrowest
+       timing band in the pond, and Finn's favourite story */
+    { id: 'fish_willowking', biome: 'lake', from: 6, to: 22, rare: true, weather: 'rain', band: 0.16 }
   ];
 
   /* gift result lines, per NPC voice (§3.1) */
@@ -444,11 +448,12 @@ window.WAction = (function () {
   }
 
   /* ---- fishing (§5.2): stage 1 bite, stage 2 timing bar ---- */
-  function pickFish(biome, h) {
+  function pickFish(biome, h, weather) {
     var q = [], i, f;
     for (i = 0; i < FISH_DEFS.length; i++) {
       f = FISH_DEFS[i];
-      if (inWindow(h, f.from, f.to) && (f.biome === null || f.biome === biome)) q.push(f);
+      if (inWindow(h, f.from, f.to) && (f.biome === null || f.biome === biome) &&
+          (!f.weather || f.weather === weather)) q.push(f);
     }
     if (!q.length) return 'fish_minnow';
     for (i = 0; i < q.length; i++) {
@@ -489,8 +494,15 @@ window.WAction = (function () {
                              // same-frame press resolves instead of NaN-missing
         fish.fishId = pickFish(
           world.biomeAt((fish.bx / world.TILE) | 0, (fish.by / world.TILE) | 0),
-          lastEnv ? WU.hnorm(lastEnv.hour) : 12);
-        fish.bandW = fish.fishId === 'fish_moonfish' ? 0.18 : 0.30;
+          lastEnv ? WU.hnorm(lastEnv.hour) : 12,
+          lastEnv ? lastEnv.weather : 'clear');
+        fish.bandW = 0.30;
+        for (var fd = 0; fd < FISH_DEFS.length; fd++) {
+          if (FISH_DEFS[fd].id === fish.fishId && FISH_DEFS[fd].band) {
+            fish.bandW = FISH_DEFS[fd].band;
+            break;
+          }
+        }
         fish.bandPos = WU.rand(0.08, 0.92 - fish.bandW);
         WAudio.sfx('reel');
         break;
