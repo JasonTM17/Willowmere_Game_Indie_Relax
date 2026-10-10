@@ -448,6 +448,17 @@ window.WNpcs = (function () {
     if (env && env.frozen) return;           // NPCs pause during dialogue
     if (n.repathCd > 0) n.repathCd -= dt;
 
+    /* displaced too far from the day's anchor (spawn gap, a shove, a stale
+       wander target): go back to real pathfinding — 'wander' aims ±36 px
+       around the anchor and has no stuck detection, so a cross-map beeline
+       could pin a villager against a wall forever */
+    if ((n.mode === 'idle' || n.mode === 'wander') && n.anchor &&
+        WU.dist(n.x, n.y, n.anchor.x, n.anchor.y) > 160) {
+      n.mode = 'travel';
+      n.path = null;
+      n.stuckT = 0;
+    }
+
     if (n.mode === 'idle') {
       n.idleT -= dt;
       if (n.idleT <= 0) {
@@ -491,10 +502,15 @@ window.WNpcs = (function () {
     }
     var wp = n.path[n.pi];
     var last = n.pi >= n.path.length - 1;
-    var gx = last ? n.anchor.x : wp.x;
-    var gy = last ? n.anchor.y : wp.y;
+    /* a blocked POI (hive, nap tree, counter) gets a path that ends on the
+       closest free neighbour tile — that waypoint is the real target then,
+       not the anchor centre the villager can never stand on */
+    var aT = WWorld.TILE || 32;
+    var anchorFree = tileFree((n.anchor.x / aT) | 0, (n.anchor.y / aT) | 0);
+    var gx = (last && anchorFree) ? n.anchor.x : wp.x;
+    var gy = (last && anchorFree) ? n.anchor.y : wp.y;
     var arrived = stepToward(n, gx, gy, dt);
-    if (last && WU.dist(n.x, n.y, n.anchor.x, n.anchor.y) < 6) arrived = true;
+    if (last && WU.dist(n.x, n.y, gx, gy) < 6) arrived = true;
     if (arrived) {
       n.mode = 'idle';
       n.idleT = WU.rand(2, 4);

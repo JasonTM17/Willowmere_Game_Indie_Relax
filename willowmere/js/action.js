@@ -187,6 +187,10 @@ window.WAction = (function () {
     }
     inventory[key] = Math.min(MAX_STACK, inventory[key] + n);
     WHUD.toast('Nhận được: ' + ITEMS[key].name + ' \u00d7' + inventory[key]);
+    /* first-touch story beats live here so every pickup (net, hand, fish,
+       gift reward) reports once — a wrapper on the export would miss all
+       the internal callers */
+    if (window.WStory && WStory.onCollect) WStory.onCollect(key);
     return true;
   }
 
@@ -981,8 +985,10 @@ window.WAction = (function () {
       updateCritters(dt, player, env);
       updateMotes(dt, player, env);
       updateEnemies(dt, player, env);
+      /* the bobber clock pauses with the world: a bite must never expire
+         inside a dialogue/vista the player can't answer */
+      updateFish(dt, player);
     }
-    updateFish(dt, player);
     if (swingT > 0) swingT -= dt;
     if (weapon.swingT > 0) weapon.swingT -= dt;
     if (weapon.cd > 0) weapon.cd -= dt;

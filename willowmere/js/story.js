@@ -17,7 +17,7 @@ window.WStory = (function () {
 
   var flags = {};          // single flag registry; never rebound (reset clears in place)
   var lampLit = false;
-  var actionHooked = false;
+
 
   /* ---- quest defs (§7 shape) ---- */
   var QUESTS = {
@@ -232,16 +232,8 @@ window.WStory = (function () {
     }
   }
 
-  function hookAction() {
-    if (actionHooked || !window.WAction || typeof WAction.add !== 'function') return;
-    actionHooked = true;
-    var baseAdd = WAction.add;
-    WAction.add = function (key, n) {
-      var ok = baseAdd(key, n);
-      if (ok && window.WStory && WStory.onCollect) WStory.onCollect(key);
-      return ok;
-    };
-  }
+  /* onCollect is fired from inside WAction.add itself — wrapping the export
+     used to miss every internal caller (net catches, motes, fish) */
 
   /* silent recount after loading a save */
   function recomputeEmbers() {
@@ -293,7 +285,6 @@ window.WStory = (function () {
 
   function update(env) {
     var e = env || {};
-    hookAction();
 
     /* --- availability gates (first meeting opens the quest) --- */
     if (QUESTS.honey_loaf.state === 'locked' && flag('met_mira')) setState('honey_loaf', 'available');

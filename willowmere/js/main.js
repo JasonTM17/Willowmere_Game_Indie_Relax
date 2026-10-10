@@ -758,11 +758,14 @@ window.WGame = (function () {
     updateVistaTrigger();
     if (state !== 'PLAY') return;   // a vista took over this frame
 
+    /* the open pouch owns combat keys: E eats, and swing/net/fish/sling
+       must not reach the world behind the bag */
+    var bagged = WHUD.bagOpen && WHUD.bagOpen();
     /* sling aim + fire */
     var m = WInput.mouse;
     if (m.inside) {
       WAction.setAim({ x: cam.x + m.x / zoom, y: cam.y + m.y / zoom });
-      if (m.clicked && !sleepFx.active) {
+      if (m.clicked && !sleepFx.active && !bagged) {
         WAction.trySling(cam.x + m.x / zoom, cam.y + m.y / zoom, player);
       }
     } else {
@@ -772,19 +775,19 @@ window.WGame = (function () {
     if (!sleepFx.active && !faintFx.active) {
       if (WInput.pressed('interact')) {
         /* bag open: E eats the hovered food instead of touching the world */
-        if (WHUD.bagOpen && WHUD.bagOpen()) {
+        if (bagged) {
           var hk = WHUD.bagHover && WHUD.bagHover();
           if (hk) WAction.eat(hk);
         } else {
           doInteract();
         }
       }
-      if (WInput.pressed('attack')) WAction.trySwing(player);
-      if (WInput.pressed('net')) {
+      if (!bagged && WInput.pressed('attack')) WAction.trySwing(player);
+      if (!bagged && WInput.pressed('net')) {
         if (player.boat) WHUD.toast('Lưới không với được từ xuồng.');
         else WAction.tryNet(player);
       }
-      if (WInput.pressed('fish')) WAction.tryFish(player, WWorld);
+      if (!bagged && WInput.pressed('fish')) WAction.tryFish(player, WWorld);
       if (WInput.pressed('pause')) { prePause = 'PLAY'; pauseSel = 0; state = 'PAUSE'; }
     }
 
