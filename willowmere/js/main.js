@@ -34,6 +34,9 @@ window.WGame = (function () {
   var last = 0, raf = 0;
   var hasSave = false;
   var saveInfo = null;          // cached readSave() for the title's save line
+  var OPTS_KEY = 'willowmere_opts';
+  var opts = { shake: true };   // accessibility prefs, persisted separately from the save
+  var pulseT = 0;               // slow clock for ambient UI pulses (low-hp warning)
   var curMusic = '';
   var audioReadySeen = false;
   var arcadeOverlay = null;     // the old cabinet: Neon Swarm iframe overlay
@@ -77,6 +80,8 @@ window.WGame = (function () {
 
     hasSave = anySaveExists();
     saveInfo = readSave();
+    var o = WU.load(OPTS_KEY);
+    if (o && typeof o === 'object') for (var ok2 in o) opts[ok2] = o[ok2];
     WAssets.load();          // background; placeholders render until settled
 
     /* sleep offer via hook (overrides world's direct sleep call) */
@@ -476,7 +481,7 @@ window.WGame = (function () {
     var d = Math.sqrt(dx * dx + dy * dy) || 1;
     player.kx = dx / d * 190; player.ky = dy / d * 190; player.kt = 0.22;
     hurtFx = 0.4;
-    shakeT = 0.16;                       // the camera feels it too
+    if (opts.shake) shakeT = 0.16;       // the camera feels it too — unless the player asked it not to
     if (window.WAction && WAction.cancelFish) WAction.cancelFish('Dây đứt mất rồi!');
     WAudio.sfx('hurt');
     if (window.WParticles) {
@@ -673,6 +678,7 @@ window.WGame = (function () {
     WDialogue.env = env;   // live state for requires checks
     WWorld.env = env;
     syncEnv();
+    pulseT += dt;
 
     switch (state) {
       case 'TITLE': updateTitle(dt); break;
@@ -873,7 +879,7 @@ window.WGame = (function () {
 
   function updateSettings(dt) {
     WParticles.update(dt, WWorld);
-    var rows = 4;                     // music · sfx · mute · back
+    var rows = 5;                     // music · sfx · mute · shake · back
     if (WInput.pressed('up')) { settingsSel = (settingsSel + rows - 1) % rows; WAudio.sfx('click'); }
     if (WInput.pressed('down')) { settingsSel = (settingsSel + 1) % rows; WAudio.sfx('click'); }
     var step = 0;
@@ -884,6 +890,12 @@ window.WGame = (function () {
         WAudio.setMuted(!WAudio.isMuted());
         WAudio.sfx(WAudio.isMuted() ? 'pop' : 'chime');
       }
+    } else if (settingsSel === 3) {   // screen shake: accessibility toggle
+      if (step !== 0 || WInput.pressed('interact')) {
+        opts.shake = !opts.shake;
+        WU.save(OPTS_KEY, opts);
+        WAudio.sfx(opts.shake ? 'chime' : 'pop');
+      }
     } else if (step !== 0 && settingsSel < 2) {
       if (settingsSel === 0) {
         WAudio.setMusicVolume(WAudio.getMusicVolume() + step * 0.1);
@@ -893,18 +905,22 @@ window.WGame = (function () {
       WAudio.sfx('click'); // live preview blip
     }
     if (WInput.pressed('pause')) { state = settingsReturn; return; }
-    if (WInput.pressed('interact') && settingsSel === 3) { WAudio.sfx('click'); state = settingsReturn; }
+    if (WInput.pressed('interact') && settingsSel === 4) { WAudio.sfx('click'); state = settingsReturn; }
     var bs = WHUD.buttons();
     for (var i = 0; i < bs.length; i++) {
       if (hit(WInput.mouse, bs[i])) {
         var want = bs[i].id === 'music' ? 0 : bs[i].id === 'sfx' ? 1 :
-                   bs[i].id === 'mute' ? 2 : 3;
+                   bs[i].id === 'mute' ? 2 : bs[i].id === 'shake' ? 3 : 4;
         if (settingsSel !== want) { settingsSel = want; WAudio.sfx('click'); }
         if (WInput.mouse.clicked) {
           if (bs[i].id === 'back') { WAudio.sfx('click'); state = settingsReturn; }
           else if (bs[i].id === 'mute') {
             WAudio.setMuted(!WAudio.isMuted());
             WAudio.sfx(WAudio.isMuted() ? 'pop' : 'chime');
+          } else if (bs[i].id === 'shake') {
+            opts.shake = !opts.shake;
+            WU.save(OPTS_KEY, opts);
+            WAudio.sfx(opts.shake ? 'chime' : 'pop');
           }
         }
       }
@@ -1092,7 +1108,7 @@ window.WGame = (function () {
         WHUD.draw(ctx, env, frameState);
       }
       WHUD.drawSettingsOn(ctx, settingsSel, WAudio.getMusicVolume(), WAudio.getSfxVolume(),
-        WAudio.isMuted ? WAudio.isMuted() : false);
+        WAudio.isMuted ? WAudio.isMuted() : false, opts.shake);
     } else {
       /* PLAY / DIALOGUE / ARCADE (the iframe covers the screen anyway) */
       WHUD.draw(ctx, env, frameState);
@@ -1109,6 +1125,17 @@ window.WGame = (function () {
       hg.addColorStop(0, 'rgba(150,26,30,0)');
       hg.addColorStop(1, 'rgba(150,26,30,' + ha.toFixed(3) + ')');
       ctx.fillStyle = hg;
+      ctx.fillRect(0, 0, vw, vh);
+    }
+
+    /* one heart left — the rim breathes a quiet, persistent warning */
+    if (player.hp === 1 && hurtFx <= 0 && !faintFx.active && !sleepFx.active &&
+        (state === 'PLAY' || state === 'DIALOGUE' || state === 'VISTA' || state === 'PAUSE')) {
+      var la = 0.10 + Math.sin(pulseT * 4.2) * 0.055;
+      var lg = ctx.createRadialGradient(vw / 2, vh / 2, vh * 0.3, vw / 2, vh / 2, vh * 0.8);
+      lg.addColorStop(0, 'rgba(150,26,30,0)');
+      lg.addColorStop(1, 'rgba(150,26,30,' + la.toFixed(3) + ')');
+      ctx.fillStyle = lg;
       ctx.fillRect(0, 0, vw, vh);
     }
 

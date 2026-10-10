@@ -849,13 +849,13 @@ window.WHUD = (function () {
   }
 
   /* ---- Settings ---- */
-  function drawSettingsOn(ctx, sel, musicVol, sfxVol, muteOn) {
+  function drawSettingsOn(ctx, sel, musicVol, sfxVol, muteOn, shakeOn) {
     var vw = ctx.canvas.width / uiDpr();
     var vh = ctx.canvas.height / uiDpr();
     buttons.length = 0;
     ctx.fillStyle = 'rgba(8,10,16,0.55)';
     ctx.fillRect(0, 0, vw, vh);
-    var w = 380, h = 300;
+    var w = 380, h = 350;
     var x = vw / 2 - w / 2, y = vh / 2 - h / 2;
     panel(ctx, x, y, w, h);
     ctx.textAlign = 'center';
@@ -866,7 +866,8 @@ window.WHUD = (function () {
     var rows = [
       { id: 'music', label: 'Nhạc', v: musicVol },
       { id: 'sfx', label: 'Hiệu ứng', v: sfxVol },
-      { id: 'mute', label: 'Âm thanh' }
+      { id: 'mute', label: 'Âm thanh', on: !muteOn },
+      { id: 'shake', label: 'Rung màn hình', on: shakeOn }
     ];
     for (var i = 0; i < rows.length; i++) {
       var ry = y + 76 + i * 50;
@@ -890,8 +891,8 @@ window.WHUD = (function () {
         ctx.fillText(String(Math.round(rows[i].v * 10)), bx + bw2 + 12, ry);
       } else {
         ctx.font = font(13);
-        ctx.fillStyle = muteOn ? 'rgba(220,190,180,0.85)' : 'rgba(242,234,216,0.7)';
-        ctx.fillText(muteOn ? 'đã tắt tiếng' : 'đang phát', x + 130, ry);
+        ctx.fillStyle = rows[i].on ? 'rgba(242,234,216,0.7)' : 'rgba(220,190,180,0.85)';
+        ctx.fillText(rows[i].on ? 'bật' : 'tắt', x + 130, ry);
       }
       if (sel === i) {
         ctx.fillStyle = '#ffd98a';
@@ -900,7 +901,7 @@ window.WHUD = (function () {
       }
     }
     ctx.textAlign = 'center';
-    button(ctx, 'Quay lại', vw / 2 - 70, y + h - 56, 140, 38, sel === 3, false, 'back');
+    button(ctx, 'Quay lại', vw / 2 - 70, y + h - 56, 140, 38, sel === 4, false, 'back');
     ctx.font = font(11);
     ctx.fillStyle = 'rgba(242,234,216,0.5)';
     ctx.fillText('\u2190 \u2192 chỉnh \u00b7 E chọn \u00b7 Esc quay lại', vw / 2, y + h + 20);
