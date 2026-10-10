@@ -241,15 +241,15 @@ window.WWorld = (function () {
   ];
 
   var VISTA_DEFS = [
-    { id: 'willow_overlook', tx: 30, ty: 8, caption: 'Từ đây, mỗi ống khói của Willowmere đều thở ra một lời thân thiện.' },
+    { id: 'willow_overlook', name: 'Đỉnh Liễu', tx: 30, ty: 8, caption: 'Từ đây, mỗi ống khói của Willowmere đều thở ra một lời thân thiện.' },
     /* DESIGN places heron_rock at (102,28), which falls inside the lake
        ellipse; nudged to the walkable north shore 2 tiles up. */
-    { id: 'heron_rock', tx: 102, ty: 26, caption: 'Hồ giữ bầu trời của ngày hôm qua ở tận đáy.' },
+    { id: 'heron_rock', name: 'Đá Diệc', tx: 102, ty: 26, caption: 'Hồ giữ bầu trời của ngày hôm qua ở tận đáy.' },
     /* DESIGN places lighthouse_head at (69,88), which is open sea; nudged to
        the headland lip. */
-    { id: 'lighthouse_head', tx: 69, ty: 86, caption: 'Hai năm tắt ngấm. Mấy con hải âu vẫn vòng quanh, theo thói quen.' },
-    { id: 'shepherds_tor', tx: 112, ty: 60, caption: 'Cả thung lũng hiện ra, và không một thứ gì vội vã trong đó.' },
-    { id: 'old_stone_circle', tx: 14, ty: 18, caption: 'Cổ hơn cả ngọn đèn. Nó chẳng ngại chờ đợi.' }
+    { id: 'lighthouse_head', name: 'Mũi Hải Đăng', tx: 69, ty: 86, caption: 'Hai năm tắt ngấm. Mấy con hải âu vẫn vòng quanh, theo thói quen.' },
+    { id: 'shepherds_tor', name: 'Đồi Chăn Cừu', tx: 112, ty: 60, caption: 'Cả thung lũng hiện ra, và không một thứ gì vội vã trong đó.' },
+    { id: 'old_stone_circle', name: 'Vòng Đá Cổ', tx: 14, ty: 18, caption: 'Cổ hơn cả ngọn đèn. Nó chẳng ngại chờ đợi.' }
   ];
 
   /* ---- interactable onUse implementations (engine-stage behaviour) ---- */
@@ -705,6 +705,7 @@ window.WWorld = (function () {
       var vd = VISTA_DEFS[v];
       vistas.push({
         id: vd.id,
+        name: vd.name,
         x: vd.tx * TILE + TILE / 2,
         y: vd.ty * TILE + TILE / 2,
         caption: vd.caption,

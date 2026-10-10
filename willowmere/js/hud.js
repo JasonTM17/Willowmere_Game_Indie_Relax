@@ -241,10 +241,13 @@ window.WHUD = (function () {
       qSnap[k2] = q.state;
       if (q.state === 'available' && prev === 'locked') {
         toast('Nhiệm vụ mới: ' + q.title);
+        if (window.WAudio) WAudio.sfx('chime');
       } else if (q.state === 'active') {
         toast('Đã nhận: ' + q.title);
+        if (window.WAudio) WAudio.sfx('interact');
       } else if (q.state === 'done_a' || q.state === 'done_b') {
         toast('Hoàn thành: ' + q.title);
+        if (window.WAudio) WAudio.sfx('bell');
       }
     }
   }
@@ -458,8 +461,11 @@ window.WHUD = (function () {
     ctx.fillText('Tab \u2014 đóng', vw / 2, y + h - 16);
   }
 
-  /* ---- collection journal (B): every critter & fish the island offers,
-     name revealed once it's ever touched your pouch (got_* flags) ---- */
+  /* ---- collection journal (B): every critter & fish the island offers
+     (left column), plus the vistas you've stood in and the keepsakes the
+     island has let you pocket (right column). Names reveal on first
+     contact (got_* / vista_* flags); hints never hide — the journal
+     teaches you to hunt. ---- */
   function drawJournal(ctx, vw, vh) {
     var A = window.WAction, S = window.WStory;
     if (!A || !A.ITEMS) return;
@@ -474,15 +480,29 @@ window.WHUD = (function () {
       var ka = A.ITEMS[a].kind, kb = A.ITEMS[b].kind;
       return ka === kb ? 0 : (ka === 'critter' ? -1 : 1);
     });
-    var found = 0;
-    for (var fi = 0; fi < rows.length; fi++) {
+    var vrs = (window.WWorld && WWorld.vistas) || [];
+    var keeps = [];
+    for (key in A.ITEMS) {
+      if (A.ITEMS.hasOwnProperty(key) && A.ITEMS[key].kind === 'treasure') keeps.push(key);
+    }
+    var found = 0, vFound = 0, kFound = 0, fi;
+    for (fi = 0; fi < rows.length; fi++) {
       if (S && S.flag && S.flag('got_' + rows[fi])) found++;
+    }
+    for (fi = 0; fi < vrs.length; fi++) {
+      if (S && S.flag && S.flag('vista_' + vrs[fi].id)) vFound++;
+    }
+    for (fi = 0; fi < keeps.length; fi++) {
+      if (S && S.flag && S.flag('got_' + keeps[fi])) kFound++;
     }
 
     ctx.fillStyle = 'rgba(8,10,16,0.45)';
     ctx.fillRect(0, 0, vw, vh);
 
-    var w = 380, rh = 24, h = 96 + rows.length * rh;
+    var rh = 22, colW = 272;
+    var w = colW * 2 + 56;
+    var rightRows = vrs.length + keeps.length + 4; // section heads + gaps
+    var h = 100 + Math.max(rows.length, rightRows) * rh;
     var x = Math.round(vw / 2 - w / 2), y = Math.round(vh / 2 - h / 2);
     panel(ctx, x, y, w, h, { accent: true });
 
@@ -492,32 +512,71 @@ window.WHUD = (function () {
     ctx.fillText('SỔ TAY CỦA QUẢN LÝ', vw / 2, y + 30);
     ctx.font = font(11);
     ctx.fillStyle = cream(0.7);
-    ctx.fillText(found + ' / ' + rows.length + ' loài đã ghi vào sổ', vw / 2, y + 48);
+    ctx.fillText(found + '/' + rows.length + ' loài \u00b7 ' + vFound + '/' + vrs.length +
+      ' nơi \u00b7 ' + kFound + '/' + keeps.length + ' kỷ vật', vw / 2, y + 48);
 
+    /* left column — species */
     ctx.textAlign = 'left';
-    for (var i = 0; i < rows.length; i++) {
-      var it = A.ITEMS[rows[i]];
-      var got = S && S.flag && S.flag('got_' + rows[i]);
+    var i, it, got, nm, nmW, held;
+    for (i = 0; i < rows.length; i++) {
+      it = A.ITEMS[rows[i]];
+      got = S && S.flag && S.flag('got_' + rows[i]);
       var ry = y + 66 + i * rh;
-      WU.gemToken(ctx, x + 26, ry + 7, 6,
-        it.kind === 'fish' ? 205 : 38);
-      ctx.font = font(12, true);
+      WU.gemToken(ctx, x + 22, ry + 7, 5.5, it.kind === 'fish' ? 205 : 38);
+      ctx.font = font(11, true);
       ctx.fillStyle = got ? '#f6eeda' : cream(0.38);
-      var nm = got ? it.name : '? ? ?';
-      var nmW = ctx.measureText(nm).width;   // measured in the drawn font
-      ctx.fillText(nm, x + 42, ry + 11);
-      var held = A.count(rows[i]);
+      nm = got ? it.name : '? ? ?';
+      nmW = ctx.measureText(nm).width;   // measured in the drawn font
+      ctx.fillText(nm, x + 36, ry + 11);
+      held = A.count(rows[i]);
       if (held > 0) {
-        ctx.font = font(11, true);
+        ctx.font = font(10, true);
         ctx.fillStyle = '#ffe9b8';
-        ctx.textAlign = 'right';
-        ctx.fillText('×' + held, x + w - 20, ry + 11);
-        ctx.textAlign = 'left';
+        ctx.fillText('\u00d7' + held, x + 36 + nmW + 6, ry + 11);
+        nmW += 6 + ctx.measureText('\u00d7' + held).width;
       }
       /* the hint line never hides — the journal teaches you to hunt */
-      ctx.font = font(10, false, true);
+      ctx.font = font(9, false, true);
       ctx.fillStyle = got ? cream(0.55) : cream(0.32);
-      ctx.fillText(it.desc, x + 42 + Math.min(150, nmW + 14), ry + 11);
+      ctx.fillText(it.desc, x + 36 + Math.min(108, nmW + 12), ry + 11);
+    }
+
+    /* right column — vistas then keepsakes */
+    var rx = x + colW + 56;
+    var ry2 = y + 66;
+    ctx.font = font(10, true);
+    ctx.fillStyle = '#ffd98a';
+    ctx.fillText('NƠI ĐẸP', rx + 14, ry2 + 4);
+    ry2 += rh;
+    for (i = 0; i < vrs.length; i++) {
+      var v = vrs[i], vgot = S && S.flag && S.flag('vista_' + v.id);
+      ctx.fillStyle = vgot ? '#ffe9b8' : cream(0.3);
+      ctx.beginPath();
+      ctx.arc(rx + 16, ry2 + 7, vgot ? 4 : 3, 0, WU.TAU);
+      ctx.fill();
+      ctx.font = font(11, true);
+      ctx.fillStyle = vgot ? '#f6eeda' : cream(0.38);
+      ctx.fillText(vgot ? (v.name || v.id) : '? ? ?', rx + 28, ry2 + 11);
+      ry2 += rh;
+    }
+    ry2 += 8;
+    ctx.font = font(10, true);
+    ctx.fillStyle = '#ffd98a';
+    ctx.fillText('KỶ VẬT', rx + 14, ry2 + 4);
+    ry2 += rh;
+    for (i = 0; i < keeps.length; i++) {
+      it = A.ITEMS[keeps[i]];
+      got = S && S.flag && S.flag('got_' + keeps[i]);
+      WU.gemToken(ctx, rx + 16, ry2 + 7, 5.5, 45);
+      ctx.font = font(11, true);
+      ctx.fillStyle = got ? '#f6eeda' : cream(0.38);
+      nm = got ? it.name : '? ? ?';
+      ctx.fillText(nm, rx + 28, ry2 + 11);
+      nmW = ctx.measureText(nm).width;
+      ctx.font = font(9, false, true);
+      ctx.fillStyle = got ? cream(0.55) : cream(0.32);
+      ctx.fillText(it.desc, rx + 28 + nmW + 10, ry2 + 11);
+      ry2 += rh;
     }
 
     ctx.textAlign = 'center';
