@@ -764,12 +764,19 @@ window.WGame = (function () {
   }
 
   function updatePlay(dt) {
+    var bagged = WHUD.bagOpen && WHUD.bagOpen();
+    var journaled = WHUD.journalOpen && WHUD.journalOpen();
+    var overlaid = bagged || journaled;
     if (faintFx.active) {
       env.frozen = true;
       updateFaint(dt);
     } else if (sleepFx.active) {
       env.frozen = true;
       updateSleep(dt);
+    } else if (overlaid) {
+      /* the pouch and journal soft-pause the world: no free enemy hits or
+         expired fish bites while the player is behind a panel */
+      env.frozen = true;
     } else {
       env.frozen = false;
       updatePlayer(dt);
@@ -801,9 +808,6 @@ window.WGame = (function () {
 
     /* the open pouch owns combat keys: E eats, and swing/net/fish/sling
        must not reach the world behind the bag */
-    var bagged = WHUD.bagOpen && WHUD.bagOpen();
-    var journaled = WHUD.journalOpen && WHUD.journalOpen();
-    var overlaid = bagged || journaled;
     /* sling aim + fire */
     var m = WInput.mouse;
     if (m.inside) {
