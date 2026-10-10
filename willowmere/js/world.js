@@ -102,6 +102,7 @@ window.WWorld = (function () {
   var edgeList = null;    // Int32Array [tx,ty,...]
   var wetList = null;     // Int32Array [tx,ty,...]
   var treeList = [];      // indices into props (willows + pines)
+  var minimapPix = null;  // Uint8ClampedArray W*H*4 — one px per tile
 
   /* static-ground cache: biome/path/trail/pier tiles never change after
      build(), so they render once into an offscreen canvas and blit in one
@@ -794,6 +795,33 @@ window.WWorld = (function () {
       var kind = props[pi].kind;
       if (kind === 'willow_big' || kind === 'willow_small' || kind === 'pine') {
         treeList.push(pi);
+      }
+    }
+
+    /* 16. minimap pixels — one RGBA quad per tile, DOM-free so the smoke
+       harness can build it too. hud.js lazily wraps this into an ImageData
+       once, at first draw. Priority: pier > water > path/trail > solid >
+       biome ground. */
+    minimapPix = new Uint8ClampedArray(W * H * 4);
+    for (ty = 0; ty < H; ty++) {
+      for (tx = 0; tx < W; tx++) {
+        i = idx(tx, ty);
+        var c;
+        if (pier[i]) c = [150, 116, 74];            // decking
+        else if (water[i]) c = [58, 108, 158];      // lake + sea
+        else if (path[i] || trail[i]) c = [196, 152, 92];  // walked dirt
+        else if (solid[i]) c = [92, 74, 56];        // roofs + rooted props
+        else {
+          var b = BIOME_NAMES[biome[i]];
+          c = b === 'forest' ? [88, 128, 74] :
+              b === 'hills' ? [118, 128, 92] :
+              b === 'beach' ? [216, 188, 132] :
+              b === 'headland' ? [100, 116, 84] :
+              [126, 158, 92];                      // meadow + village ground
+        }
+        var o = i * 4;
+        minimapPix[o] = c[0]; minimapPix[o + 1] = c[1]; minimapPix[o + 2] = c[2];
+        minimapPix[o + 3] = 255;
       }
     }
 
@@ -2273,6 +2301,8 @@ window.WWorld = (function () {
     solidAt: solidAt,
     waterAt: waterAt,
     weatherRoll: weatherRoll,
+    /* 1-px-per-tile RGBA map for the HUD minimap (hud wraps it in ImageData) */
+    minimapPixels: function () { ensureBuilt(); return minimapPix; },
 
     poi: poi,
     vistas: vistas,

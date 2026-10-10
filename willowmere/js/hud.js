@@ -261,6 +261,68 @@ window.WHUD = (function () {
     }
   }
 
+  /* ---- minimap (top-right): 1 px per tile, live dots for souls ----
+     The terrain bitmap is rendered once from WWorld.minimapPixels and
+     cached; dots for the player (white) and villagers (amber) redraw
+     every frame. A quest-ready villager glows gold so the map points
+     somewhere, not just shows something. */
+  var miniCv = null;
+  function drawMinimap(ctx, vw, env) {
+    var W = window.WWorld;
+    if (!W || !W.minimapPixels || !W.isBuilt || !W.isBuilt()) return;
+    if (!miniCv) {
+      if (typeof document === 'undefined' || typeof ImageData === 'undefined') {
+        miniCv = 'skip';   // headless: dots still draw over a blank panel
+      } else {
+        var pix = W.minimapPixels();
+        if (!pix) return;
+        var cv = document.createElement('canvas');
+        cv.width = W.W; cv.height = W.H;
+        var im = new ImageData(W.W, W.H);
+        im.data.set(pix);
+        cv.getContext('2d').putImageData(im, 0, 0);
+        miniCv = cv;
+      }
+    }
+    var MW = W.W, MH = W.H, mx = vw - MW - 16, my = 12;
+    panel(ctx, mx - 4, my - 4, MW + 8, MH + 8, { radius: 8, alpha: 0.82 });
+    ctx.save();
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(mx, my, MW, MH, 5); else ctx.rect(mx, my, MW, MH);
+    ctx.clip();
+    if (miniCv !== 'skip') ctx.drawImage(miniCv, mx, my);
+    var t = W.TILE || 32;
+    /* villagers — amber, quest-givers glow */
+    var N = window.WNpcs;
+    if (N && N.list) {
+      var ns = N.list();
+      for (var i = 0; i < ns.length; i++) {
+        var n = ns[i];
+        if (n.hidden) continue;
+        var glow = window.WStory && WStory.questNodeFor &&
+                   (WStory.questNodeFor(n.def.id) ||
+                    (WStory.talkBonusNode && WStory.talkBonusNode(n.def.id)));
+        ctx.fillStyle = glow ? '#ffd95e' : 'rgba(255,214,150,0.85)';
+        ctx.beginPath();
+        ctx.arc(mx + n.x / t, my + n.y / t, glow ? 2.6 : 1.8, 0, WU.TAU);
+        ctx.fill();
+      }
+    }
+    /* player — white pulse so the eye finds you first */
+    var pl = env && env.player;
+    if (pl) {
+      var pulse = 2 + Math.sin(performance.now() * 0.006) * 0.5;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(mx + pl.x / t, my + pl.y / t, pulse + 0.8, 0, WU.TAU);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(20,16,10,0.7)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   /* ---- pouch (bag) ---- */
   function drawBag(ctx, vw, vh) {
     var A = window.WAction;
@@ -448,6 +510,8 @@ window.WHUD = (function () {
       ctx.fillStyle = '#c8dcea';
       ctx.fillText('Ngày mai có mưa', fx + 26, 63);
     }
+
+    drawMinimap(ctx, vw, env);
 
     /* quest panel: active quests (with current step), then available */
     var S = window.WStory;

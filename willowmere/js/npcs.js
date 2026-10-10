@@ -833,10 +833,41 @@ window.WNpcs = (function () {
     ctx.save();
     ctx.translate(-Math.round(lastCam.x), -Math.round(lastCam.y));
     var player = env && env.player;
+    var now = (window.performance && performance.now) ? performance.now() : Date.now();
+    var bob = Math.sin(now * 0.005) * 2;             // gentle float, all markers in phase
     for (var i = 0; i < list.length; i++) {
       var n = list[i];
       if (n.hidden) continue;
       if (n.bubble && n.bubble.t > 0) drawBubble(ctx, n.x, n.y, n.bubble.text);
+      /* name tag: walking near someone shows who they are before the
+         E-prompt does — villagers stop being strangers at ~3 tiles */
+      if (player && !n.hidden &&
+          WU.dist(player.x, player.y, n.x, n.y) < 92 && !n.bubble) {
+        ctx.font = '600 10px "Segoe UI",Verdana,sans-serif';
+        ctx.textAlign = 'center';
+        var firstName = n.def.name.split(' ')[0];
+        ctx.fillStyle = 'rgba(16,14,10,0.62)';
+        var nw = ctx.measureText(firstName).width + 12;
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(n.x - nw / 2, n.y + 6, nw, 14, 7);
+        else ctx.rect(n.x - nw / 2, n.y + 6, nw, 14);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(246,238,218,0.95)';
+        ctx.fillText(firstName, n.x, n.y + 16);
+      }
+      /* a quest waits on this villager — gold '!' says who, the quest card
+         already says what. Bonus hand-offs (Marlow's staff, Junie's thanks)
+         count too. Hidden while speaking (bubble owns the space). */
+      if (!n.bubble && window.WStory && WStory.questNodeFor &&
+          (WStory.questNodeFor(n.def.id) ||
+           (WStory.talkBonusNode && WStory.talkBonusNode(n.def.id)))) {
+        ctx.font = '700 15px "Segoe UI",Verdana,sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(60,42,10,0.9)';
+        ctx.fillText('!', n.x + 1, n.y - 56 + bob + 1);
+        ctx.fillStyle = '#ffd95e';
+        ctx.fillText('!', n.x, n.y - 56 + bob);
+      }
     }
     if (player) {
       for (i = 0; i < sessions.length; i++) {
