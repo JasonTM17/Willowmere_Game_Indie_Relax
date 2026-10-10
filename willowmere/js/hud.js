@@ -682,10 +682,12 @@ window.WHUD = (function () {
 
   /* toasts also need a home on screens that skip the HUD (title) */
   function drawToasts(ctx, dt, vw, vh) {
+    /* dt arrives in seconds (frameState.dt); toast timers are milliseconds */
+    var dms = (dt || 0) * 1000;
     var ty = vh - 68;
     for (var i = toasts.length - 1; i >= 0; i--) {
       var t = toasts[i];
-      t.t -= dt;
+      t.t -= dms;
       if (t.t <= 0) { toasts.splice(i, 1); continue; }
       ctx.font = font(13);
       var twd = ctx.measureText(t.text).width + 34;
@@ -704,7 +706,7 @@ window.WHUD = (function () {
   }
 
   /* ---- Title ---- */
-  function drawTitleOn(ctx, sel, hasSave) {
+  function drawTitleOn(ctx, sel, hasSave, saveInfo) {
     var vw = ctx.canvas.width / uiDpr();
     var vh = ctx.canvas.height / uiDpr();
     buttons.length = 0;
@@ -771,6 +773,15 @@ window.WHUD = (function () {
     for (var i = 0; i < items.length; i++) {
       button(ctx, items[i].label, vw / 2 - bw / 2, by + i * (bh + 14), bw, bh,
         i === sel, items[i].dim, items[i].id);
+      /* the save earns a quiet sub-line: which day, what hour you'd wake to */
+      if (items[i].id === 'continue' && hasSave && saveInfo &&
+          typeof saveInfo.day === 'number' && typeof saveInfo.hour === 'number') {
+        ctx.font = font(11);
+        ctx.fillStyle = cream(0.6);
+        ctx.textAlign = 'center';
+        ctx.fillText('Ngày ' + saveInfo.day + ' \u00b7 ' + WU.fmtHour(saveInfo.hour),
+          vw / 2, by + i * (bh + 14) + bh + 11);
+      }
     }
 
     /* controls hint in a quiet pill — wraps to two lines on narrow windows */

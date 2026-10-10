@@ -33,6 +33,7 @@ window.WGame = (function () {
 
   var last = 0, raf = 0;
   var hasSave = false;
+  var saveInfo = null;          // cached readSave() for the title's save line
   var curMusic = '';
   var audioReadySeen = false;
   var arcadeOverlay = null;     // the old cabinet: Neon Swarm iframe overlay
@@ -75,6 +76,7 @@ window.WGame = (function () {
     zoomTgt = 0.8;           // title backdrop: gentle pull-back over the green
 
     hasSave = anySaveExists();
+    saveInfo = readSave();
     WAssets.load();          // background; placeholders render until settled
 
     /* sleep offer via hook (overrides world's direct sleep call) */
@@ -169,6 +171,7 @@ window.WGame = (function () {
     state = 'TITLE';
     titleSel = 0;
     hasSave = anySaveExists();
+    saveInfo = readSave();
     env.hour = 18.4;
     env.frozen = false;
     if (player.boat) { player.boat.prop._inUse = false; player.boat = null; }
@@ -336,6 +339,7 @@ window.WGame = (function () {
     var ok = WU.save(SAVE_KEY, data);
     if (!silent) WHUD.toast(ok ? 'Đã lưu.' : 'Không lưu được ở đây (file:// có thể chặn bộ nhớ).');
     hasSave = !!ok;
+    if (ok) saveInfo = data;
     return ok;
   }
 
@@ -1074,7 +1078,7 @@ window.WGame = (function () {
     ctx.imageSmoothingEnabled = false;
 
     if (state === 'TITLE') {
-      WHUD.drawTitleOn(ctx, titleSel, hasSave);
+      WHUD.drawTitleOn(ctx, titleSel, hasSave, saveInfo);
       if (WHUD.drawToasts) WHUD.drawToasts(ctx, frameState.dt || 1 / 60, vw, vh);
     } else if (state === 'VISTA' && vista) {
       WHUD.drawVistaOn(ctx, vista.v, Math.min(1, vista.t / 1.2));
@@ -1083,7 +1087,7 @@ window.WGame = (function () {
       WHUD.drawPauseOn(ctx, pauseSel);
     } else if (state === 'SETTINGS') {
       if (settingsReturn === 'TITLE') {
-        WHUD.drawTitleOn(ctx, -1, hasSave);
+        WHUD.drawTitleOn(ctx, -1, hasSave, saveInfo);
       } else {
         WHUD.draw(ctx, env, frameState);
       }
