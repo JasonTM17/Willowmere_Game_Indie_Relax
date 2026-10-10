@@ -706,7 +706,7 @@ window.WHUD = (function () {
   }
 
   /* ---- Title ---- */
-  function drawTitleOn(ctx, sel, hasSave, saveInfo) {
+  function drawTitleOn(ctx, sel, hasSave, saveInfo, confirmNew) {
     var vw = ctx.canvas.width / uiDpr();
     var vh = ctx.canvas.height / uiDpr();
     buttons.length = 0;
@@ -764,7 +764,7 @@ window.WHUD = (function () {
 
     /* menu */
     var items = [
-      { id: 'new', label: 'Chơi mới' },
+      { id: 'new', label: confirmNew ? 'Chơi mới — chắc chưa?' : 'Chơi mới' },
       { id: 'continue', label: hasSave ? 'Tiếp tục' : 'Tiếp tục (chưa có lưu)', dim: !hasSave },
       { id: 'settings', label: 'Cài đặt' }
     ];
@@ -773,6 +773,14 @@ window.WHUD = (function () {
     for (var i = 0; i < items.length; i++) {
       button(ctx, items[i].label, vw / 2 - bw / 2, by + i * (bh + 14), bw, bh,
         i === sel, items[i].dim, items[i].id);
+      /* armed confirm: warn what a fresh start costs, under the button */
+      if (items[i].id === 'new' && confirmNew) {
+        ctx.font = font(11);
+        ctx.fillStyle = 'rgba(255,170,140,0.85)';
+        ctx.textAlign = 'center';
+        ctx.fillText('File lưu ngày ' + (saveInfo ? saveInfo.day : '?') +
+          ' sẽ bị ghi đè khi em ngủ', vw / 2, by + i * (bh + 14) + bh + 11);
+      }
       /* the save earns a quiet sub-line: which day, what hour you'd wake to */
       if (items[i].id === 'continue' && hasSave && saveInfo &&
           typeof saveInfo.day === 'number' && typeof saveInfo.hour === 'number') {

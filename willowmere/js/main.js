@@ -42,6 +42,7 @@ window.WGame = (function () {
   var arcadeOverlay = null;     // the old cabinet: Neon Swarm iframe overlay
 
   var titleSel = 0;
+  var titleConfirmNew = false;   // armed by the first "Chơi mới" press when a save exists
   var pauseSel = 0;
   var settingsSel = 0;
   var vista = null;          // active vista record {v, t, first}
@@ -175,6 +176,7 @@ window.WGame = (function () {
   function toTitle() {
     state = 'TITLE';
     titleSel = 0;
+    titleConfirmNew = false;
     hasSave = anySaveExists();
     saveInfo = readSave();
     env.hour = 18.4;
@@ -715,20 +717,32 @@ window.WGame = (function () {
     env.frozen = false;        // the village lives behind the menu
     WNpcs.update(dt, env);
     WParticles.update(dt, WWorld);
-    if (WInput.pressed('up')) { titleSel = (titleSel + 2) % 3; WAudio.sfx('click'); }
-    if (WInput.pressed('down')) { titleSel = (titleSel + 1) % 3; WAudio.sfx('click'); }
+    if (WInput.pressed('up')) { titleSel = (titleSel + 2) % 3; titleConfirmNew = false; WAudio.sfx('click'); }
+    if (WInput.pressed('down')) { titleSel = (titleSel + 1) % 3; titleConfirmNew = false; WAudio.sfx('click'); }
+    if (WInput.pressed('pause') && titleConfirmNew) titleConfirmNew = false;
     if (WInput.pressed('interact')) activateTitle();
     var bs = WHUD.buttons();
     for (var i = 0; i < bs.length; i++) {
       if (hit(WInput.mouse, bs[i])) {
-        if (titleSel !== i) { titleSel = i; WAudio.sfx('click'); }  // hover = same cue as keys
+        if (titleSel !== i) { titleSel = i; titleConfirmNew = false; WAudio.sfx('click'); }
         if (WInput.mouse.clicked) activateTitle();
       }
     }
   }
 
   function activateTitle() {
-    if (titleSel === 0) { WAudio.sfx('interact'); newGame(); }
+    if (titleSel === 0) {
+      /* a save on file gets one extra beat before a fresh start
+         buries it — autosaves would quietly overwrite it anyway */
+      if (hasSave && !titleConfirmNew) {
+        titleConfirmNew = true;
+        WAudio.sfx('click');
+        return;
+      }
+      titleConfirmNew = false;
+      WAudio.sfx('interact');
+      newGame();
+    }
     else if (titleSel === 1) {
       if (hasSave) { WAudio.sfx('interact'); continueGame(); }
       else WAudio.sfx('click');
@@ -1107,7 +1121,7 @@ window.WGame = (function () {
     ctx.imageSmoothingEnabled = false;
 
     if (state === 'TITLE') {
-      WHUD.drawTitleOn(ctx, titleSel, hasSave, saveInfo);
+      WHUD.drawTitleOn(ctx, titleSel, hasSave, saveInfo, titleConfirmNew);
       if (WHUD.drawToasts) WHUD.drawToasts(ctx, frameState.dt || 1 / 60, vw, vh);
     } else if (state === 'VISTA' && vista) {
       WHUD.drawVistaOn(ctx, vista.v, Math.min(1, vista.t / 1.2));
