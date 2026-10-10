@@ -397,6 +397,14 @@ window.WHUD = (function () {
     var gl = night ? 'night' : (weather === 'rain' ? 'rain' : 'sun');
     WU.weatherGlyph(ctx, gl, cx + cw - 22, 19, 12);
 
+    /* hearts — player hp rides the top-left corner */
+    var pl = env && env.player;
+    if (pl && typeof pl.hp === 'number') {
+      var maxH = pl.maxHp || 3;
+      panel(ctx, 12, 12, 22 + maxH * 18, 26, { radius: 13, alpha: 0.85 });
+      for (var hi = 0; hi < maxH; hi++) heart(ctx, 22 + hi * 18, 17, 16, hi < pl.hp);
+    }
+
     /* rain forecast chip: rain is rolled at 06:00 for the whole day */
     if (weather !== 'rain' && rainTomorrow(env)) {
       ctx.font = font(11, true);
@@ -461,7 +469,7 @@ window.WHUD = (function () {
     }
 
     /* tool chips — keycap + label, sized to content */
-    var chips = [['Q', 'Lưới'], ['F', 'Cần'], ['\u25ce', 'Nỏ'], ['Tab', 'Túi']];
+    var chips = [['Q', 'Lưới'], ['F', 'Cần'], ['J', 'Gậy'], ['\u25ce', 'Nỏ'], ['Tab', 'Túi']];
     var chx = vw - 12;
     ctx.textAlign = 'left';
     for (i = chips.length - 1; i >= 0; i--) {
@@ -587,7 +595,7 @@ window.WHUD = (function () {
     }
 
     /* controls hint in a quiet pill */
-    var hint = 'WASD di chuyển \u00b7 E tương tác \u00b7 Q lưới \u00b7 F câu \u00b7 click nỏ \u00b7 Tab túi \u00b7 Esc tạm dừng';
+    var hint = 'WASD di chuyển \u00b7 E tương tác \u00b7 Q lưới \u00b7 F câu \u00b7 J gậy \u00b7 click nỏ \u00b7 Tab túi \u00b7 Esc tạm dừng';
     ctx.font = font(12);
     var hw = ctx.measureText(hint).width + 36;
     panel(ctx, vw / 2 - hw / 2, vh - 40, hw, 26, { radius: 13, alpha: 0.7 });

@@ -1,7 +1,7 @@
 /* Willowmere — input.js · window.WInput
    Bind-once keyboard + mouse. Leaf library: never calls game layers.
    - Actions: move WASD/arrows · interact E/Enter/Space · net Q · fish F ·
-     pause Esc/P · menus use up/down/left/right.
+     attack J · pause Esc/P · menus use up/down/left/right.
    - pressed() = edge-true for one frame; consume() takes the edge away.
    - mouse is in CSS-pixel canvas space {x,y,inside,clicked,released}.
    - endFrame() clears all edges; the main loop calls it last every frame.
@@ -17,6 +17,7 @@
     interact: ['KeyE', 'Enter', 'Space'],
     net: ['KeyQ'],
     fish: ['KeyF'],
+    attack: ['KeyJ'],
     pause: ['Escape', 'KeyP']
   };
 

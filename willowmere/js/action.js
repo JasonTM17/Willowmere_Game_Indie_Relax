@@ -161,7 +161,9 @@ window.WAction = (function () {
     critters.length = 0;
     motes.length = 0;
     projs.length = 0;
+    enemies.length = 0;
     swingT = 0;
+    weapon.swingT = 0; weapon.cd = 0; weapon.outT = 0;
     fish.state = 'idle';
   }
 
@@ -547,6 +549,16 @@ window.WAction = (function () {
           }
         }
         if (!p) break;
+        for (j = enemies.length - 1; j >= 0; j--) {
+          var fe = enemies[j];
+          if (WU.dist(p.x, p.y, fe.x, fe.y - 8) < fe.def.r + 4) {
+            hurtEnemy(fe, p.x - p.vx * 0.05, p.y - p.vy * 0.05);  // pushes along the shot
+            projs.splice(i, 1);
+            p = null;
+            break;
+          }
+        }
+        if (!p) break;
         for (j = 0; j < critters.length; j++) {
           if (WU.dist(p.x, p.y, critters[j].x, critters[j].y) < 14) {
             startle(critters[j]);                // critters are never harmed
@@ -583,6 +595,238 @@ window.WAction = (function () {
           p = null;
         }
       }
+    }
+  }
+
+  /* ==================== COMBAT ====================
+     The wooden staff (J) and the two things that answer it:
+     - 'wisp'  — a willow shadow held past its time (the same trapped light
+       the motes are made of); nights 20:00-05:00 in forest / hills /
+       headland. Pops into sparkles + a freed mote.
+     - 'crab'  — rock crab, days 7:00-18:00 on the beach. Drops a sand crab.
+     Enemies wander until the player steps inside their aggro radius, then
+     chase; a touch costs 1 heart via WGame.hurtPlayer. Staff swings and
+     slingshot pebbles both deal 1 damage with a knockback push. */
+
+  var ENEMY_DEFS = {
+    wisp: { hp: 2, speed: 46, r: 9, aggro: 150, drop: 'mote' },
+    crab: { hp: 3, speed: 32, r: 10, aggro: 110, drop: 'critter_sand_crab' }
+  };
+  var enemies = [];
+  var enemyT = 5;
+
+  /* staff state: swingT = the active arc, cd = re-swing lockout,
+     outT = the stick stays drawn while foes linger nearby */
+  var weapon = { swingT: 0, cd: 0, outT: 0 };
+  var SWING_CD = 0.42, SWING_DUR = 0.26, SWING_R = 34, SWING_ARC = 1.15;
+
+  function enemyWalkable(x, y) {
+    return !WWorld.solidAt(x, y - 4) && !WWorld.solidAt(x, y + 4) &&
+           !WWorld.solidAt(x - 4, y) && !WWorld.solidAt(x + 4, y) &&
+           !WWorld.waterAt(x, y);
+  }
+
+  function makeEnemy(kind, x, y) {
+    var def = ENEMY_DEFS[kind];
+    return { kind: kind, def: def, hp: def.hp, x: x, y: y,
+      wx: x, wy: y, wt: WU.rand(1, 3), kx: 0, ky: 0, kt: 0,
+      flash: 0, seed: WU.rand(0, 6.283) };
+  }
+
+  function spawnEnemy(px, py, env) {
+    var h = WU.hnorm(env.hour);
+    var night = h >= 20 || h < 5;
+    var ang = WU.rand(0, WU.TAU), d = WU.rand(224, 448);
+    var x = px + Math.cos(ang) * d, y = py + Math.sin(ang) * d;
+    var biome = WWorld.biomeAt((x / WWorld.TILE) | 0, (y / WWorld.TILE) | 0);
+    var kind = null;
+    if (night) {
+      if (biome === 'forest' || biome === 'hills' || biome === 'headland') kind = 'wisp';
+    } else if (biome === 'beach') {
+      kind = 'crab';
+    }
+    if (!kind || enemies.length >= 6 || !enemyWalkable(x, y)) return;
+    enemies.push(makeEnemy(kind, x, y));
+  }
+
+  function hurtEnemy(e, sx, sy, dmg) {
+    e.hp -= (dmg || 1);
+    var dx = e.x - sx, dy = e.y - sy;
+    var d = Math.sqrt(dx * dx + dy * dy) || 1;
+    e.kx = dx / d * 200; e.ky = dy / d * 200; e.kt = 0.16;
+    e.flash = 0.14;
+    if (window.WParticles) {
+      WParticles.emit('floattext', e.x, e.y - 20,
+        { text: '−1', color: 'rgba(255,122,108,1)', life: 0.8 });
+    }
+    if (e.hp <= 0) {
+      var i = enemies.indexOf(e);
+      if (i >= 0) enemies.splice(i, 1);
+      burst(e.x, e.y - 8, 'sparkle', 10);
+      if (e.def.drop) add(e.def.drop, 1);
+      if (e.kind === 'wisp' && window.WParticles) {
+        WParticles.emit('mote', e.x, e.y - 10, {});   // the freed light, drifting
+      }
+      WAudio.sfx(e.kind === 'wisp' ? 'sparkle' : 'pop');
+    } else {
+      WAudio.sfx('hit');
+    }
+  }
+
+  function updateEnemies(dt, player, env) {
+    enemyT -= dt;
+    if (enemyT <= 0) {
+      enemyT = WU.rand(3, 6);
+      spawnEnemy(player.x, player.y, env);
+    }
+    for (var i = enemies.length - 1; i >= 0; i--) {
+      var e = enemies[i];
+      var dp = WU.dist(e.x, e.y, player.x, player.y);
+      if (dp > 640) { enemies.splice(i, 1); continue; }
+      if (e.flash > 0) e.flash -= dt;
+      if (e.kt > 0) {                             // the hit's push owns the foe
+        e.kt -= dt;
+        var bx = e.x + e.kx * dt, by = e.y + e.ky * dt;
+        if (enemyWalkable(bx, e.y)) e.x = bx;
+        if (enemyWalkable(e.x, by)) e.y = by;
+      } else {
+        var chase = !player.boat && dp < e.def.aggro;
+        var speed, tx, ty;
+        if (chase) {
+          speed = e.def.speed; tx = player.x; ty = player.y;
+        } else {
+          e.wt -= dt;
+          if (e.wt <= 0) {
+            e.wt = WU.rand(1.5, 3.5);
+            e.wx = e.x + WU.rand(-46, 46);
+            e.wy = e.y + WU.rand(-46, 46);
+          }
+          speed = e.def.speed * 0.4; tx = e.wx; ty = e.wy;
+        }
+        var dx = tx - e.x, dy = ty - e.y;
+        var dd = Math.sqrt(dx * dx + dy * dy);
+        if (dd > 2) {
+          var nx = e.x + dx / dd * speed * dt;
+          var ny = e.y + dy / dd * speed * dt;
+          if (enemyWalkable(nx, e.y)) e.x = nx;
+          if (enemyWalkable(e.x, ny)) e.y = ny;
+        }
+      }
+      if (!player.boat && dp < e.def.r + 11 && window.WGame && WGame.hurtPlayer) {
+        WGame.hurtPlayer(1, e.x, e.y);
+      }
+      /* a hostile nearby keeps the staff in hand */
+      if (dp < 220) weapon.outT = Math.max(weapon.outT, 1.2);
+    }
+  }
+
+  /* J — the staff arc: 130° wedge ahead of the facing direction */
+  function trySwing(player) {
+    if (weapon.cd > 0) return false;
+    weapon.cd = SWING_CD;
+    weapon.swingT = SWING_DUR;
+    weapon.outT = Math.max(weapon.outT, 3);
+    WAudio.sfx('swing');
+    var v = DIRV[player.dir] || DIRV.down;
+    var base = Math.atan2(v[1], v[0]);
+    var hit = false;
+    for (var i = enemies.length - 1; i >= 0; i--) {
+      var e = enemies[i];
+      var dx = e.x - player.x, dy = e.y - (player.y - 10);
+      var d = Math.sqrt(dx * dx + dy * dy);
+      if (d > SWING_R + e.def.r) continue;
+      var da = Math.atan2(Math.sin(Math.atan2(dy, dx) - base),
+                        Math.cos(Math.atan2(dy, dx) - base));
+      if (Math.abs(da) > SWING_ARC) continue;
+      hurtEnemy(e, player.x, player.y);
+      hit = true;
+    }
+    if (window.WStory && !WStory.flag('staff_hint_shown')) {
+      WStory.setFlag('staff_hint_shown', true);
+      if (window.WHUD) WHUD.toast('Bạn rút gậy gỗ ra \u2014 J để vung quét, cẩn thận bóng đêm và cua đá.');
+    }
+    return hit;
+  }
+
+  function drawEnemy(ctx, e, cam) {
+    var bob = Math.sin(e.seed * 7 + (lastEnv ? lastEnv.hour * 60 : 0)) * 2;
+    var blink = e.flash > 0;
+    ctx.save();
+    ctx.translate(-Math.round(cam.x), -Math.round(cam.y));
+    if (e.kind === 'wisp') {
+      var cy = e.y - 14 + bob;
+      /* soft violet halo, then the shadow body and its pale eyes */
+      ctx.globalAlpha = 0.4;
+      ctx.fillStyle = 'rgba(130,118,235,0.55)';
+      ctx.beginPath(); ctx.arc(e.x, cy, 13, 0, WU.TAU); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = blink ? '#f2ecff' : '#2c2749';
+      ctx.beginPath(); ctx.arc(e.x, cy, 7.5, 0, WU.TAU); ctx.fill();
+      ctx.fillStyle = blink ? '#4a3f7a' : '#cfe8ff';
+      ctx.fillRect(e.x - 3.4, cy - 1.5, 2, 2);
+      ctx.fillRect(e.x + 1.4, cy - 1.5, 2, 2);
+    } else {
+      /* crab: shadow, scuttling legs, shell, claws, eye stalks */
+      ctx.fillStyle = 'rgba(0,0,0,0.18)';
+      ctx.beginPath(); ctx.ellipse(e.x, e.y - 1, 10, 3, 0, 0, WU.TAU); ctx.fill();
+      ctx.strokeStyle = blink ? '#ffe9d0' : '#a8502e';
+      ctx.lineWidth = 1.5;
+      for (var l = -1; l <= 1; l += 2) {
+        ctx.beginPath(); ctx.moveTo(e.x + l * 5, e.y - 4); ctx.lineTo(e.x + l * 11, e.y - 1); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(e.x + l * 5, e.y - 7); ctx.lineTo(e.x + l * 11, e.y - 4); ctx.stroke();
+      }
+      var cy2 = e.y - 7 + bob * 0.4;
+      ctx.fillStyle = blink ? '#ffcf9e' : '#c86238';
+      ctx.beginPath(); ctx.ellipse(e.x, cy2, 7.5, 5.5, 0, 0, WU.TAU); ctx.fill();
+      ctx.fillStyle = blink ? '#ffe2c2' : '#e07840';
+      ctx.beginPath(); ctx.arc(e.x - 8, cy2 - 3, 3, 0, WU.TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(e.x + 8, cy2 - 3, 3, 0, WU.TAU); ctx.fill();
+      ctx.fillStyle = '#241a12';
+      ctx.fillRect(e.x - 2.5, cy2 - 6, 1.6, 2.4);
+      ctx.fillRect(e.x + 1, cy2 - 6, 1.6, 2.4);
+    }
+    /* hp pip bar — only once wounded */
+    if (e.hp < e.def.hp) {
+      ctx.fillStyle = 'rgba(20,20,26,0.8)';
+      ctx.fillRect(e.x - 8, e.y - 27, 16, 3);
+      ctx.fillStyle = '#ff7a6c';
+      ctx.fillRect(e.x - 8, e.y - 27, 16 * e.hp / e.def.hp, 3);
+    }
+    ctx.restore();
+  }
+
+  /* the staff itself: a wooden stick resting at the shoulder while drawn,
+     sweeping a 170° arc during swingT — drawn over the body */
+  function drawWeapon(ctx, player) {
+    if (weapon.outT <= 0) return;
+    var v = DIRV[player.dir] || DIRV.down;
+    var b = Math.atan2(v[1], v[0]);
+    var hx = player.x + v[0] * 5 - v[1] * 6;   // the hand: ahead-and-side
+    var hy = player.y - 18 + v[1] * 3;
+    var ang;
+    if (weapon.swingT > 0) {
+      var t = 1 - weapon.swingT / SWING_DUR;
+      ang = b - 1.5 + t * 3;                    // sweeps past the facing line
+    } else {
+      ang = b + 1.05;                           // rest: along the shoulder
+    }
+    ctx.save();
+    ctx.translate(hx, hy);
+    ctx.rotate(ang);
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#7a5430';
+    ctx.lineWidth = 3.4;
+    ctx.beginPath(); ctx.moveTo(-7, 0); ctx.lineTo(17, 0); ctx.stroke();
+    ctx.strokeStyle = '#caa06a';
+    ctx.lineWidth = 1.1;
+    ctx.beginPath(); ctx.moveTo(-7, -1.1); ctx.lineTo(17, -1.1); ctx.stroke();
+    ctx.restore();
+    if (weapon.swingT > 0) {                    // the arc flash
+      ctx.strokeStyle = 'rgba(255,240,200,' + (0.55 * weapon.swingT / SWING_DUR).toFixed(3) + ')';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(player.x, player.y - 10, 30, b - 1.15, b + 1.15);
+      ctx.stroke();
     }
   }
 
@@ -640,9 +884,13 @@ window.WAction = (function () {
     if (!env.frozen) {
       updateCritters(dt, player, env);
       updateMotes(dt, player, env);
+      updateEnemies(dt, player, env);
     }
     updateFish(dt);
     if (swingT > 0) swingT -= dt;
+    if (weapon.swingT > 0) weapon.swingT -= dt;
+    if (weapon.cd > 0) weapon.cd -= dt;
+    if (weapon.outT > 0) weapon.outT -= dt;
     if (!env.frozen) updateProjs(dt);
   }
 
@@ -757,6 +1005,7 @@ window.WAction = (function () {
         ctx.fillRect(player.x + dx * t2 - 1, player.y - 20 + dy * t2 - 1, 2, 2);
       }
     }
+    drawWeapon(ctx, player);
     ctx.restore();
   }
 
@@ -787,6 +1036,14 @@ window.WAction = (function () {
     tryNet: tryNet,
     tryFish: tryFish,
     trySling: trySling,
+    trySwing: trySwing,
+    enemies: function () { return enemies; },
+    spawnEnemyFor: function (kind, x, y) {   // test/debug hook
+      var e = makeEnemy(kind, x, y);
+      enemies.push(e);
+      return e;
+    },
+    drawEnemy: drawEnemy,
     gift: gift,
     setAim: function (a) { aim = a; },
     fishState: function () { return fish.state; },

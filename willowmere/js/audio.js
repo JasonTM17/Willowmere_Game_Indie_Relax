@@ -213,6 +213,15 @@
       case 'net':
         noise(0.22, 0.12, 1800);
         tone(520, 170, 0.20, 'sine', 0.05); break;
+      case 'swing':                       /* staff whoosh */
+        noise(0.14, 0.13, 2600);
+        tone(300, 140, 0.10, 'triangle', 0.06); break;
+      case 'hit':                         /* staff connects */
+        noise(0.08, 0.16, 900);
+        tone(200, 90, 0.12, 'square', 0.12); break;
+      case 'hurt':                        /* player takes a hit */
+        tone(220, 110, 0.22, 'square', 0.14);
+        noise(0.18, 0.10, 700); break;
       case 'pop':
         tone(520, 1040, 0.09, 'sine', 0.15); break;
       case 'catch':

@@ -20,7 +20,8 @@ window.WGame = (function () {
     day: 1, hour: 18.4, weather: 'clear', night: false,
     frozen: false, player: null
   };
-  var player = { x: 944, y: 1872, dir: 'down', walkT: 0, moving: false, speed: 84, boat: null };
+  var player = { x: 944, y: 1872, dir: 'down', walkT: 0, moving: false, speed: 84, boat: null,
+    hp: 3, maxHp: 3, invuln: 0, kx: 0, ky: 0, kt: 0 };
   var lastStep = -1;         // walk-frame counter at the last emitted footstep
 
   var cam = { x: 0, y: 0 };
@@ -43,6 +44,9 @@ window.WGame = (function () {
   var vinside = false;       // player was inside a vista radius last PLAY frame
   var epi = { shown: false, t: 0, scroll: 0, lines: [] };
   var sleepFx = { active: false, phase: 0, t: 0 };
+  var faintFx = { active: false, phase: 0, t: 0 };
+  var hurtFx = 0;              // red vignette seconds-left after taking a hit
+  var regenT = 45;             // one heart quietly mends every 45 s of play
 
   /* ============================== BOOT ============================== */
 
@@ -165,6 +169,10 @@ window.WGame = (function () {
     env.hour = 18.4;
     env.frozen = false;
     if (player.boat) { player.boat.prop._inUse = false; player.boat = null; }
+    player.invuln = 0;
+    player.kt = 0;
+    faintFx.active = false;
+    hurtFx = 0;
     zoomTgt = 0.8;
     WParticles.clear();
     WAction.setAim(null);
@@ -186,9 +194,14 @@ window.WGame = (function () {
     player.y = 1872;
     player.dir = 'down';
     player.boat = null;
+    player.hp = player.maxHp;
+    player.invuln = 0;
+    player.kx = 0; player.ky = 0; player.kt = 0;
     zoomTgt = 1;
     epi.shown = false;
     sleepFx.active = false;
+    faintFx.active = false;
+    hurtFx = 0;
     snapCamera();
     syncEnv();
     WHUD.clearToasts();
@@ -213,6 +226,9 @@ window.WGame = (function () {
       player.x = d.player.x;
       player.y = d.player.y;
       player.dir = d.player.dir || 'down';
+      if (typeof d.player.hp === 'number') {
+        player.hp = WU.clamp(Math.floor(d.player.hp), 1, player.maxHp);
+      }
     }
     /* boats: hulls keep where they were moored; being aboard round-trips too */
     if (d.boats) {
@@ -294,7 +310,7 @@ window.WGame = (function () {
       day: env.day,
       hour: env.hour,
       weather: env.weather,
-      player: { x: Math.round(player.x), y: Math.round(player.y), dir: player.dir },
+      player: { x: Math.round(player.x), y: Math.round(player.y), dir: player.dir, hp: player.hp },
       flags: WStory.flags,
       quests: quests,
       friend: friend,
@@ -333,6 +349,8 @@ window.WGame = (function () {
       env.day += 1;
       env.hour = 6.5;
       env.weather = WWorld.weatherRoll(env.day);
+      player.hp = player.maxHp;      // sleep knits everything back together
+      player.invuln = 0;
       WParticles.clear();
       saveGame(true);
       WHUD.toast('Ngày ' + env.day + ' \u2014 06:30. ' + (env.weather === 'rain' ? 'Mưa gõ trên mái.' : 'Nắng sớm trong vắt.'));
@@ -376,6 +394,17 @@ window.WGame = (function () {
   }
 
   function updatePlayer(dt) {
+    if (player.invuln > 0) player.invuln -= dt;
+    /* a hit staggers: knockback owns the feet for its 0.22 s */
+    if (player.kt > 0) {
+      player.kt -= dt;
+      var kfree = player.boat ? boatFree : boxFree;
+      var bx = player.x + player.kx * dt, by = player.y + player.ky * dt;
+      if (kfree(bx, player.y)) player.x = bx;
+      if (kfree(player.x, by)) player.y = by;
+      player.moving = false;
+      return;
+    }
     var ax = WInput.axis();
     player.moving = !!(ax.x || ax.y);
     if (player.moving) {
@@ -416,6 +445,56 @@ window.WGame = (function () {
           }
         }
       }
+    }
+  }
+
+  /* ============================== COMBAT ============================== */
+
+  function hurtPlayer(dmg, sx, sy) {
+    if (player.invuln > 0 || faintFx.active || sleepFx.active) return;
+    if (state !== 'PLAY' && state !== 'DIALOGUE' && state !== 'VISTA') return;
+    player.hp = Math.max(0, player.hp - (dmg || 1));
+    player.invuln = 1.2;
+    var dx = player.x - sx, dy = player.y - sy;
+    var d = Math.sqrt(dx * dx + dy * dy) || 1;
+    player.kx = dx / d * 190; player.ky = dy / d * 190; player.kt = 0.22;
+    hurtFx = 0.4;
+    WAudio.sfx('hurt');
+    if (window.WParticles) {
+      WParticles.emit('floattext', player.x, player.y - 44,
+        { text: '−1', color: 'rgba(255,122,108,1)', life: 0.8 });
+    }
+    if (player.hp <= 0) startFaint();
+  }
+
+  /* a gentle defeat: fade, then wake at your own doorstep, whole again */
+  function startFaint() {
+    if (faintFx.active) return;
+    faintFx.active = true;
+    faintFx.phase = 0;
+    faintFx.t = 0;
+    env.frozen = true;
+    WAction.setAim(null);
+    WAudio.sfx('sleep');
+  }
+
+  function updateFaint(dt) {
+    faintFx.t += dt;
+    if (faintFx.phase === 0 && faintFx.t >= 1.1) {
+      faintFx.phase = 1;
+      faintFx.t = 0;
+      if (player.boat) { player.boat.prop._inUse = false; player.boat = null; }
+      player.x = 944; player.y = 1872; player.dir = 'down';
+      player.hp = player.maxHp;
+      player.invuln = 2.5;
+      player.kx = 0; player.ky = 0; player.kt = 0;
+      snapCamera();
+      WParticles.clear();
+      WHUD.toast('Bạn tỉnh dậy trước cửa nhà \u2014 đầu còn ong ong. Những bóng đã tan.');
+    } else if (faintFx.phase === 1 && faintFx.t >= 1) {
+      faintFx.active = false;
+      env.frozen = false;
+      saveGame(true);
     }
   }
 
@@ -629,7 +708,10 @@ window.WGame = (function () {
   }
 
   function updatePlay(dt) {
-    if (sleepFx.active) {
+    if (faintFx.active) {
+      env.frozen = true;
+      updateFaint(dt);
+    } else if (sleepFx.active) {
       env.frozen = true;
       updateSleep(dt);
     } else {
@@ -642,7 +724,13 @@ window.WGame = (function () {
         env.weather = WWorld.weatherRoll(env.day);
         WHUD.toast('Ngày ' + env.day + '.');
       }
+      /* hearts mend slowly on their own; a full sleep restores them all */
+      if (player.hp < player.maxHp) {
+        regenT -= dt;
+        if (regenT <= 0) { regenT = 45; player.hp += 1; }
+      }
     }
+    if (hurtFx > 0) hurtFx -= dt;
     clearExpiredRain();
     syncEnv();
 
@@ -664,8 +752,9 @@ window.WGame = (function () {
       WAction.setAim(null);
     }
 
-    if (!sleepFx.active) {
+    if (!sleepFx.active && !faintFx.active) {
       if (WInput.pressed('interact')) doInteract();
+      if (WInput.pressed('attack')) WAction.trySwing(player);
       if (WInput.pressed('net')) {
         if (player.boat) WHUD.toast('Lưới không với được từ xuồng.');
         else WAction.tryNet(player);
@@ -847,20 +936,29 @@ window.WGame = (function () {
     WWorld.drawBack(ctx, cam, env);
     WAction.drawUnder(ctx, cam, player);
 
-    /* y-sorted bodies: NPCs + player (player hidden behind the title menu) */
+    /* y-sorted bodies: NPCs + foes + player (player hidden behind the
+       title menu); foes join the same sort so depth stays honest */
     var list = WNpcs.list();
+    var foes = (WAction.enemies ? WAction.enemies() : []);
     var i, n;
+    var ents = [];
+    for (i = 0; i < list.length; i++) {
+      n = list[i];
+      if (!n.hidden) ents.push({ y: n.y, npc: n });
+    }
+    for (i = 0; i < foes.length; i++) ents.push({ y: foes[i].y, foe: foes[i] });
+    ents.sort(function (a, b) { return a.y - b.y; });
     var pY = player.y;
     var playerDrawn = false;
     var showPlayer = state !== 'TITLE';
-    for (i = 0; i < list.length; i++) {
-      n = list[i];
-      if (n.hidden) continue;    // away villagers (junie_leaves) draw nothing
-      if (showPlayer && !playerDrawn && n.y > pY) {
+    for (i = 0; i < ents.length; i++) {
+      var e2 = ents[i];
+      if (showPlayer && !playerDrawn && e2.y > pY) {
         drawPlayerBody();
         playerDrawn = true;
       }
-      WNpcs.drawBody(ctx, n, cam);
+      if (e2.npc) WNpcs.drawBody(ctx, e2.npc, cam);
+      else WAction.drawEnemy(ctx, e2.foe, cam);
     }
     if (showPlayer && !playerDrawn) drawPlayerBody();
     WNpcs.draw(ctx, cam, env);
@@ -876,7 +974,12 @@ window.WGame = (function () {
   function drawPlayerBody() {
     if (player.boat) WWorld.drawBoatHull(ctx, player.x, player.y);
     var frame = player.moving ? 1 + (((player.walkT * 5.5) | 0) % 2) : 0;
+    /* invulnerability blink: after a hit the body flickers instead of
+       pretending nothing happened */
+    var blink = player.invuln > 0 && (((player.invuln * 14) | 0) % 2 === 0);
+    if (blink) ctx.globalAlpha = 0.45;
     WNpcs.drawChar(ctx, player.x, player.y, player.dir, frame, 0, cam);
+    ctx.globalAlpha = 1;
     /* wool cloak: white scarf in the rain (cosmetic, §3.2 lost_lamb B) */
     if (WAction.count('wool_cloak') > 0 && env.weather === 'rain') {
       ctx.fillStyle = 'rgba(245,242,235,0.95)';
@@ -959,10 +1062,27 @@ window.WGame = (function () {
       WDialogue.draw(ctx);
     }
 
+    /* hurt vignette — the rim of the world goes red for a blink */
+    if (hurtFx > 0) {
+      var ha = Math.min(0.38, hurtFx);
+      var hg = ctx.createRadialGradient(vw / 2, vh / 2, vh * 0.3, vw / 2, vh / 2, vh * 0.8);
+      hg.addColorStop(0, 'rgba(150,26,30,0)');
+      hg.addColorStop(1, 'rgba(150,26,30,' + ha.toFixed(3) + ')');
+      ctx.fillStyle = hg;
+      ctx.fillRect(0, 0, vw, vh);
+    }
+
     /* sleep fade */
     if (sleepFx.active) {
       var a = sleepFx.phase === 0 ? Math.min(1, sleepFx.t) : 1 - Math.min(1, sleepFx.t);
       ctx.fillStyle = 'rgba(6,8,12,' + a.toFixed(3) + ')';
+      ctx.fillRect(0, 0, vw, vh);
+    }
+
+    /* faint fade — warmer, duskier dark than the sleep one */
+    if (faintFx.active) {
+      var fa = faintFx.phase === 0 ? Math.min(1, faintFx.t / 1.1) : 1 - Math.min(1, faintFx.t);
+      ctx.fillStyle = 'rgba(28,10,18,' + fa.toFixed(3) + ')';
       ctx.fillRect(0, 0, vw, vh);
     }
 
@@ -1001,6 +1121,7 @@ window.WGame = (function () {
     openArcade: openArcade,
     closeArcade: closeArcade,
     boardBoat: boardBoat,
+    hurtPlayer: hurtPlayer,
     state: function () { return state; },
     player: player
   };
