@@ -686,12 +686,11 @@ window.WWorld = (function () {
 
     /* 13. interactables (§5.4) */
     interactables.push(makeInteractable('door_player', 29, 57, 'Ngủ', doorPlayerUse));
-    interactables.push(makeInteractable(
-      'door_lighthouse', 69, 85, 'Leo tháp', doorLighthouseUse,
-      { flags: ['marlow_confession'], hour: [20, 24] }));
-    interactables.push(makeInteractable(
-      'rosa_shed', 49, 54, 'Đọc lá thư', shedUse,
-      { anyFlags: ['show_won', 'show_patience'] }));
+    /* no `requires` here: the door/shed always take the prompt, and onUse
+       explains why they stay shut — an invisible interactable reads as a
+       bug, a locked one with a line reads as a promise */
+    interactables.push(makeInteractable('door_lighthouse', 69, 85, 'Leo tháp', doorLighthouseUse));
+    interactables.push(makeInteractable('rosa_shed', 49, 54, 'Đọc lá thư', shedUse));
     for (hv = 0; hv < hiveTiles.length; hv++) {
       interactables.push(makeInteractable(
         'hive_' + (hv + 1), hiveTiles[hv][0], hiveTiles[hv][1],

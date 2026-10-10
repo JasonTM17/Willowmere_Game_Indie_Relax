@@ -642,7 +642,7 @@ window.WHUD = (function () {
     buttons.length = 0;
     ctx.fillStyle = 'rgba(8,10,16,0.55)';
     ctx.fillRect(0, 0, vw, vh);
-    var w = 380, h = 292;
+    var w = 380, h = 300;
     var x = vw / 2 - w / 2, y = vh / 2 - h / 2;
     panel(ctx, x, y, w, h);
     ctx.textAlign = 'center';
@@ -653,7 +653,7 @@ window.WHUD = (function () {
     var rows = [
       { id: 'music', label: 'Nhạc', v: musicVol },
       { id: 'sfx', label: 'Hiệu ứng', v: sfxVol },
-      { id: 'mute', label: muteOn ? 'Âm thanh: Tắt' : 'Âm thanh: Bật' }
+      { id: 'mute', label: 'Âm thanh' }
     ];
     for (var i = 0; i < rows.length; i++) {
       var ry = y + 76 + i * 50;
@@ -690,7 +690,7 @@ window.WHUD = (function () {
     button(ctx, 'Quay lại', vw / 2 - 70, y + h - 56, 140, 38, sel === 3, false, 'back');
     ctx.font = font(11);
     ctx.fillStyle = 'rgba(242,234,216,0.5)';
-    ctx.fillText('\u2190 \u2192 chỉnh \u00b7 E chọn \u00b7 Esc quay lại', vw / 2, y + h - 12);
+    ctx.fillText('\u2190 \u2192 chỉnh \u00b7 E chọn \u00b7 Esc quay lại', vw / 2, y + h + 20);
   }
 
   /* ---- Vista ---- */
