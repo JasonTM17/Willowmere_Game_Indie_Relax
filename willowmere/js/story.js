@@ -46,7 +46,7 @@ window.WStory = (function () {
     },
     big_one: {
       id: 'big_one', npc: 'finn', title: 'Chú Cá Khủng',
-      hint: 'Con cá hồ huyền thoại Siltjaw. Một lần câu trúng trong lúc làm nhiệm vụ là đủ.',
+      hint: 'Con cá hồ huyền thoại Siltjaw chỉ cắn câu trong lúc săn — giữ nhịp cho trúng.',
       embers: 1, state: 'locked',
       outcomes: { a: { flag: 'finn_big_one', label: 'Kéo Siltjaw lên bờ' }, b: { flag: 'siltjaw_freed', label: 'Thả nó đi' } }
     },
@@ -538,10 +538,12 @@ window.WStory = (function () {
       choices: [
         C('(Giơ chiến lợi phẩm lên.) Siltjaw chào cậu nè.', {
           requires: { flags: ['siltjaw_caught'] },
+          take: { fish_siltjaw: 1 },
           setFlags: { finn_big_one: 1 }, next: 'q_big_one_done_a'
         }),
         C('Siltjaw là của hồ, Finn à. Để huyền thoại bơi tiếp đi.', {
           requires: { flags: ['siltjaw_caught'] },
+          take: { fish_siltjaw: 1 },
           setFlags: { siltjaw_freed: 1 }, next: 'q_big_one_done_b'
         })
       ]

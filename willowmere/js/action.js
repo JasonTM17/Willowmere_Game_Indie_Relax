@@ -27,6 +27,7 @@ window.WAction = (function () {
     fish_carp: { name: 'Cá chép', desc: 'Hồ ban đêm.', kind: 'fish' },
     fish_moonfish: { name: 'Cá trăng', desc: 'Bạc đêm quý hiếm.', kind: 'fish' },
     fish_willowking: { name: 'Cá vua liễu', desc: 'Hồ ngày mưa. Vảy rủ như cành liễu.', kind: 'fish' },
+    fish_siltjaw: { name: 'Siltjaw', desc: 'Con cá hồ huyền thoại mà Finn săn.', kind: 'fish' },
     mote: { name: 'Hạt Sáng', desc: 'Bóng liễu bị giữ lại giữa dòng trôi.', kind: 'treasure' },
     food_honeycomb: { name: 'Miếng tổ ong', desc: 'Mật rừng, vẫn còn vo ve.', kind: 'food' },
     seeds_pouch: { name: 'Túi hạt giống', desc: 'Túi vải hạt giống của Gideon.', kind: 'key' },
@@ -69,7 +70,10 @@ window.WAction = (function () {
     { id: 'fish_moonfish', biome: null, from: 21, to: 2, rare: true, band: 0.18 },
     /* the Willow King only rises while it rains on the lake — the narrowest
        timing band in the pond, and Finn's favourite story */
-    { id: 'fish_willowking', biome: 'lake', from: 6, to: 22, rare: true, weather: 'rain', band: 0.16 }
+    { id: 'fish_willowking', biome: 'lake', from: 6, to: 22, rare: true, weather: 'rain', band: 0.16 },
+    /* Siltjaw exists only while Finn's big_one hunt is live — quest-gated,
+       rare-weighted, and the hardest band on the water */
+    { id: 'fish_siltjaw', biome: 'lake', from: 0, to: 24, rare: true, band: 0.14, quest: 'big_one' }
   ];
 
   /* gift result lines, per NPC voice (§3.1) */
@@ -452,6 +456,8 @@ window.WAction = (function () {
     var q = [], i, f;
     for (i = 0; i < FISH_DEFS.length; i++) {
       f = FISH_DEFS[i];
+      if (f.quest && !(window.WStory && WStory.QUESTS[f.quest] &&
+          WStory.QUESTS[f.quest].state === 'active')) continue;   // story-locked species
       if (inWindow(h, f.from, f.to) && (f.biome === null || f.biome === biome) &&
           (!f.weather || f.weather === weather)) q.push(f);
     }
@@ -513,8 +519,9 @@ window.WAction = (function () {
             burst(fish.bx, fish.by, 'splash', 6);
             burst(player.x, player.y - 30, 'sparkle', 8);
             WAudio.sfx('catch');
-            if (window.WStory && WStory.QUESTS.big_one &&
-                WStory.QUESTS.big_one.state === 'active') {
+            /* only the real Siltjaw completes Finn's hunt — any old catch
+               used to count, which let a puddle minnow end the legend */
+            if (fish.fishId === 'fish_siltjaw' && window.WStory) {
               WStory.setFlag('siltjaw_caught', 1);
             }
           }
