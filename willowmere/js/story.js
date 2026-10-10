@@ -226,16 +226,17 @@ window.WStory = (function () {
     return n;
   }
 
-  /* item collected — wired by wrapping WAction.add once action.js exists */
+  /* item collected — fired from inside WAction.add. got_<key> marks any
+     first pickup (journal 'seen' list); FIRST picks which ones also toast */
   function onCollect(itemKey) {
     var FIRST = {
       food_honeycomb: 'Tổ ong rừng, vẫn còn vo ve. Mira sẽ cần thứ này.',
       critter_firefly: 'Một chiếc đèn lồng có cánh \u2014 Junie từng nhắc muốn phác thảo chúng.',
       moonbell: 'Nó phát sáng như ngọn đèn còn nhớ mặt trời.'
     };
-    if (FIRST[itemKey] && !flag('got_' + itemKey)) {
+    if (!flag('got_' + itemKey)) {
       setFlag('got_' + itemKey, true);
-      if (window.WHUD) WHUD.toast(FIRST[itemKey]);
+      if (FIRST[itemKey] && window.WHUD) WHUD.toast(FIRST[itemKey]);
     }
   }
 

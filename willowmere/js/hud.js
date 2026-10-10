@@ -23,6 +23,9 @@ window.WHUD = (function () {
   var bagHover = null;     // item key under the cursor while the bag is open
   var BAG_COLS = 6, BAG_ROWS = 4, BAG_SLOT = 42, BAG_GAP = 8;
 
+  /* collection journal (B) — which critters & fish you've ever caught */
+  var journalOpen = false;
+
   /* quest-state snapshot for transition toasts */
   var qSnap = null;
   var lastWeather = null;
@@ -62,16 +65,17 @@ window.WHUD = (function () {
       ? WGame.dpr() : (window.devicePixelRatio || 1);
   }
 
-  /* ---- Tab opens the pouch (HUD-internal toggle; no game state touched) -- */
+  /* ---- Tab opens the pouch, B opens the journal (HUD-internal toggles) -- */
   function onKey(e) {
-    if (e.code !== 'Tab') return;
-    e.preventDefault();
     var g = window.WGame;
-    if (g && typeof g.state === 'function' && g.state() === 'PLAY') {
-      bagOpen = !bagOpen;
-      WAudio.sfx('click');
-    } else {
-      bagOpen = false;
+    var playing = g && typeof g.state === 'function' && g.state() === 'PLAY';
+    if (e.code === 'Tab') {
+      e.preventDefault();
+      if (playing) { bagOpen = !bagOpen; if (bagOpen) journalOpen = false; WAudio.sfx('click'); }
+      else { bagOpen = false; journalOpen = false; }
+    } else if (e.code === 'KeyB') {
+      if (playing) { journalOpen = !journalOpen; if (journalOpen) bagOpen = false; WAudio.sfx('click'); }
+      else { bagOpen = false; journalOpen = false; }
     }
   }
   document.addEventListener('keydown', onKey);
@@ -454,6 +458,74 @@ window.WHUD = (function () {
     ctx.fillText('Tab \u2014 đóng', vw / 2, y + h - 16);
   }
 
+  /* ---- collection journal (B): every critter & fish the island offers,
+     name revealed once it's ever touched your pouch (got_* flags) ---- */
+  function drawJournal(ctx, vw, vh) {
+    var A = window.WAction, S = window.WStory;
+    if (!A || !A.ITEMS) return;
+    var rows = [], key;
+    for (key in A.ITEMS) {
+      if (A.ITEMS.hasOwnProperty(key)) {
+        var k2 = A.ITEMS[key].kind;
+        if (k2 === 'critter' || k2 === 'fish') rows.push(key);
+      }
+    }
+    rows.sort(function (a, b) {
+      var ka = A.ITEMS[a].kind, kb = A.ITEMS[b].kind;
+      return ka === kb ? 0 : (ka === 'critter' ? -1 : 1);
+    });
+    var found = 0;
+    for (var fi = 0; fi < rows.length; fi++) {
+      if (S && S.flag && S.flag('got_' + rows[fi])) found++;
+    }
+
+    ctx.fillStyle = 'rgba(8,10,16,0.45)';
+    ctx.fillRect(0, 0, vw, vh);
+
+    var w = 380, rh = 24, h = 96 + rows.length * rh;
+    var x = Math.round(vw / 2 - w / 2), y = Math.round(vh / 2 - h / 2);
+    panel(ctx, x, y, w, h, { accent: true });
+
+    ctx.textAlign = 'center';
+    ctx.font = font(15, true);
+    ctx.fillStyle = '#ffe9b8';
+    ctx.fillText('SỔ TAY CỦA QUẢN LÝ', vw / 2, y + 30);
+    ctx.font = font(11);
+    ctx.fillStyle = cream(0.7);
+    ctx.fillText(found + ' / ' + rows.length + ' loài đã ghi vào sổ', vw / 2, y + 48);
+
+    ctx.textAlign = 'left';
+    for (var i = 0; i < rows.length; i++) {
+      var it = A.ITEMS[rows[i]];
+      var got = S && S.flag && S.flag('got_' + rows[i]);
+      var ry = y + 66 + i * rh;
+      WU.gemToken(ctx, x + 26, ry + 7, 6,
+        it.kind === 'fish' ? 205 : 38);
+      ctx.font = font(12, true);
+      ctx.fillStyle = got ? '#f6eeda' : cream(0.38);
+      var nm = got ? it.name : '? ? ?';
+      var nmW = ctx.measureText(nm).width;   // measured in the drawn font
+      ctx.fillText(nm, x + 42, ry + 11);
+      var held = A.count(rows[i]);
+      if (held > 0) {
+        ctx.font = font(11, true);
+        ctx.fillStyle = '#ffe9b8';
+        ctx.textAlign = 'right';
+        ctx.fillText('×' + held, x + w - 20, ry + 11);
+        ctx.textAlign = 'left';
+      }
+      /* the hint line never hides — the journal teaches you to hunt */
+      ctx.font = font(10, false, true);
+      ctx.fillStyle = got ? cream(0.55) : cream(0.32);
+      ctx.fillText(it.desc, x + 42 + Math.min(150, nmW + 14), ry + 11);
+    }
+
+    ctx.textAlign = 'center';
+    ctx.font = font(11, false, true);
+    ctx.fillStyle = cream(0.55);
+    ctx.fillText('B \u2014 đóng', vw / 2, y + h - 14);
+  }
+
   /* ---- in-world HUD ---- */
   function draw(ctx, env, state) {
     var vw = ctx.canvas.width / uiDpr();
@@ -461,10 +533,12 @@ window.WHUD = (function () {
     var h = env && env.hour !== undefined ? WU.hnorm(env.hour) : 12;
     var dt = state && state.dt ? state.dt : 0;
 
-    /* pouch only makes sense while freely wandering */
+    /* overlays only make sense while freely wandering */
     var g = window.WGame;
-    if (bagOpen && (!g || typeof g.state !== 'function' || g.state() !== 'PLAY')) {
+    if ((bagOpen || journalOpen) &&
+        (!g || typeof g.state !== 'function' || g.state() !== 'PLAY')) {
       bagOpen = false;
+      journalOpen = false;
     }
 
     /* read-only watchers: quest toasts + rain watch */
@@ -567,7 +641,7 @@ window.WHUD = (function () {
 
     /* tool chips — keycap + label, sized to content. Right-to-left from
        the bottom-right corner; wraps to a row above on narrow windows. */
-    var chips = [['Q', 'Lưới'], ['F', 'Cần'], ['J', 'Gậy'], ['◎', 'Nỏ'], ['Tab', 'Túi']];
+    var chips = [['Q', 'Lưới'], ['F', 'Cần'], ['J', 'Gậy'], ['◎', 'Nỏ'], ['Tab', 'Túi'], ['B', 'Sổ']];
     var chx = vw - 12, chy = vh - 46;
     ctx.textAlign = 'left';
     for (i = chips.length - 1; i >= 0; i--) {
@@ -603,6 +677,7 @@ window.WHUD = (function () {
     }
 
     if (bagOpen) drawBag(ctx, vw, vh);
+    if (journalOpen) drawJournal(ctx, vw, vh);
   }
 
   /* toasts also need a home on screens that skip the HUD (title) */
@@ -699,7 +774,7 @@ window.WHUD = (function () {
     }
 
     /* controls hint in a quiet pill — wraps to two lines on narrow windows */
-    var hint = 'WASD di chuyển \u00b7 E tương tác \u00b7 Q lưới \u00b7 F câu \u00b7 J gậy \u00b7 click nỏ \u00b7 Tab túi \u00b7 Esc tạm dừng';
+    var hint = 'WASD di chuyển \u00b7 E tương tác \u00b7 Q lưới \u00b7 F câu \u00b7 J gậy \u00b7 click nỏ \u00b7 Tab túi \u00b7 B sổ \u00b7 Esc tạm dừng';
     ctx.font = font(12);
     var hw = ctx.measureText(hint).width + 36;
     if (hw <= vw - 24) {
@@ -709,7 +784,7 @@ window.WHUD = (function () {
       ctx.fillText(hint, vw / 2, vh - 23);
     } else {
       var l1 = 'WASD di chuyển \u00b7 E tương tác \u00b7 Q lưới \u00b7 F câu';
-      var l2 = 'J gậy \u00b7 click nỏ \u00b7 Tab túi \u00b7 Esc tạm dừng';
+      var l2 = 'J gậy \u00b7 click nỏ \u00b7 Tab túi \u00b7 B sổ \u00b7 Esc tạm dừng';
       hw = Math.max(ctx.measureText(l1).width, ctx.measureText(l2).width) + 36;
       panel(ctx, vw / 2 - hw / 2, vh - 58, hw, 44, { radius: 13, alpha: 0.7 });
       ctx.fillStyle = cream(0.72);
@@ -756,7 +831,7 @@ window.WHUD = (function () {
     ctx.font = font(11);
     ctx.fillStyle = 'rgba(242,234,216,0.7)';
     ctx.fillText('WASD di chuyển \u00b7 E tương tác \u00b7 Q lưới \u00b7 F câu', vw / 2, y + h - 54);
-    ctx.fillText('J gậy \u00b7 click nỏ \u00b7 Tab túi \u00b7 Esc tạm dừng', vw / 2, y + h - 36);
+    ctx.fillText('J gậy \u00b7 click nỏ \u00b7 Tab túi \u00b7 B sổ \u00b7 Esc tạm dừng', vw / 2, y + h - 36);
     ctx.font = font(11, false, true);
     ctx.fillStyle = 'rgba(242,234,216,0.55)';
     ctx.fillText('Tiến trình cũng được lưu khi bạn ngủ.', vw / 2, y + h - 14);
@@ -939,8 +1014,10 @@ window.WHUD = (function () {
       qSnap = null;
       lastWeather = null;
       bagOpen = false;
+      journalOpen = false;
     },
     bagOpen: function () { return bagOpen; },
-    bagHover: function () { return bagOpen ? bagHover : null; }
+    bagHover: function () { return bagOpen ? bagHover : null; },
+    journalOpen: function () { return journalOpen; }
   };
 })();
