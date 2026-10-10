@@ -116,8 +116,73 @@
     if (cur) { cur.target = 0; cur.dying = true; cur = null; }
   }
 
+  /* ---- ambient loops: rain hiss, sea swell, night crickets ----
+     One layer at a time, crossfaded; the game loop picks the kind. */
+  var amb = { kind: null, src: null, f: null, g: null, lfo: null, cricketT: 0 };
+  var AMB_LEVEL = { rain: 0.05, waves: 0.042, night: 0 };
+
+  function stopAmbient() {
+    if (amb.src) { try { amb.src.stop(); } catch (e) { /* ignore */ } }
+    if (amb.lfo) { try { amb.lfo.stop(); } catch (e) { /* ignore */ } }
+    if (amb.g) {
+      try {
+        amb.g.gain.cancelScheduledValues(ctx.currentTime);
+        amb.g.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.15);
+      } catch (e) { /* ignore */ }
+    }
+    amb.src = null; amb.f = null; amb.g = null; amb.lfo = null;
+    amb.kind = null;
+  }
+
+  function setAmbient(kind) {
+    /* nothing to do when: already running, already idle, or blocked the
+       same way as last call — the caller re-asserts every frame, so a
+       blocked wish (muted / no ctx yet) simply tries again next frame */
+    if (kind === amb.kind) {
+      if (amb.g || !kind || !ctx || !sfxGain || muted) return;
+    }
+    stopAmbient();
+    amb.kind = kind;
+    if (!kind || !ctx || !sfxGain || muted) return;
+    var t = ctx.currentTime;
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(AMB_LEVEL[kind] || 0.001, t + 1.6); // fade the world in
+    g.connect(sfxGain);
+    amb.g = g;
+    if (kind === 'rain' || kind === 'waves') {
+      var src = ctx.createBufferSource();
+      src.buffer = getNoiseBuf();
+      src.loop = true;
+      var f = ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = kind === 'rain' ? 1500 : 480;
+      src.connect(f); f.connect(g); src.start();
+      amb.src = src; amb.f = f;
+      if (kind === 'waves') {
+        /* slow swell: an LFO breathing on the noise's loudness */
+        var lfo = ctx.createOscillator();
+        lfo.frequency.value = 0.42;
+        var lg = ctx.createGain();
+        lg.gain.value = (AMB_LEVEL.waves) * 0.55;
+        lfo.connect(lg); lg.connect(g.gain); lfo.start();
+        amb.lfo = lfo;
+      }
+    }
+    /* 'night' needs no loop — update() schedules cricket chirps */
+  }
+
   /* Called once per frame by the game loop; ramps volumes (~2 s full fade). */
   function update(dt) {
+    /* cricket chirps: 3 quick trills, irregular spacing, keep it shy */
+    if (amb.kind === 'night' && ctx && sfxGain && !muted) {
+      amb.cricketT -= dt;
+      if (amb.cricketT <= 0) {
+        amb.cricketT = 0.7 + Math.random() * 1.1;
+        var base = 4100 + Math.random() * 900;
+        for (var c = 0; c < 3; c++) tone(base, base * 0.94, 0.045, 'sine', 0.011, c * 0.075);
+      }
+    }
     if (!fades.length) return;
     var step = Math.max(musicVol, 0.2) * 0.5 * dt;
     for (var i = fades.length - 1; i >= 0; i--) {
@@ -157,14 +222,20 @@
     o.stop(t + dur + 0.05);
   }
 
-  function noise(dur, vol, fc, when) {
-    if (!ctx || !sfxGain) return;
+  function getNoiseBuf() {
+    if (!ctx) return null;
     if (!noiseBuf) {
       var len = ctx.sampleRate | 0;
       noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
       var d = noiseBuf.getChannelData(0);
       for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     }
+    return noiseBuf;
+  }
+
+  function noise(dur, vol, fc, when) {
+    if (!ctx || !sfxGain) return;
+    if (!getNoiseBuf()) return;
     var t = ctx.currentTime + (when || 0);
     var src = ctx.createBufferSource();
     src.buffer = noiseBuf;
@@ -280,6 +351,8 @@
      persisted volume levels; unmuting ramps back to the stored values. */
   function setMuted(v) {
     muted = !!v;
+    stopAmbient();   // loops don't ride sfxGain's level — silence them now;
+                     // the next per-frame setAmbient rebuilds after unmute
     persist();
   }
 
@@ -295,6 +368,8 @@
     isMuted: function () { return muted; },
     getMusicVolume: function () { return musicVol; },
     getSfxVolume: function () { return sfxVol; },
-    ready: function () { return !!ctx; }
+    ready: function () { return !!ctx; },
+    setAmbient: setAmbient,
+    ambient: function () { return amb.kind; }   // test hook: which loop the world asked for
   };
 })();

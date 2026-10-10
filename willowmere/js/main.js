@@ -669,6 +669,19 @@ window.WGame = (function () {
 
   function update(dt) {
     WAudio.update(dt);
+    /* ambient director: rain hush > sea swell > night crickets. Title gets
+       the dusk chorus too — the camera sits on the village at 18:24. */
+    var ambKind = null;
+    if (state !== 'ARCADE' && WAudio.setAmbient) {
+      if (env.weather === 'rain') ambKind = 'rain';
+      else {
+        var pb = WWorld.biomeAt((player.x / 32) | 0, (player.y / 32) | 0);
+        var hh = WU.hnorm(env.hour);
+        if (pb === 'sea' || pb === 'beach') ambKind = 'waves';
+        else if (hh >= 19 || hh < 5) ambKind = 'night';
+      }
+      WAudio.setAmbient(ambKind);
+    }
     /* after the first user gesture the AudioContext exists: re-issue the
        music key once (early play() attempts are rejected pre-gesture) */
     if (!audioReadySeen && WAudio.ready()) {
