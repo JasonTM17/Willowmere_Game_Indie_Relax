@@ -20,7 +20,7 @@ window.WGame = (function () {
     day: 1, hour: 18.4, weather: 'clear', night: false,
     frozen: false, player: null
   };
-  var player = { x: 944, y: 1872, dir: 'down', walkT: 0, moving: false, speed: 84 };
+  var player = { x: 944, y: 1872, dir: 'down', walkT: 0, moving: false, speed: 84, boat: null };
   var lastStep = -1;         // walk-frame counter at the last emitted footstep
 
   var cam = { x: 0, y: 0 };
@@ -164,6 +164,7 @@ window.WGame = (function () {
     hasSave = !!readSave();
     env.hour = 18.4;
     env.frozen = false;
+    if (player.boat) { player.boat.prop._inUse = false; player.boat = null; }
     zoomTgt = 0.8;
     WParticles.clear();
     WAction.setAim(null);
@@ -184,6 +185,7 @@ window.WGame = (function () {
     player.x = 944;
     player.y = 1872;
     player.dir = 'down';
+    player.boat = null;
     zoomTgt = 1;
     epi.shown = false;
     sleepFx.active = false;
@@ -211,6 +213,21 @@ window.WGame = (function () {
       player.x = d.player.x;
       player.y = d.player.y;
       player.dir = d.player.dir || 'down';
+    }
+    /* boats: hulls keep where they were moored; being aboard round-trips too */
+    if (d.boats) {
+      for (k = 0; k < d.boats.length; k++) {
+        var br = WWorld.boatById(d.boats[k].id);
+        if (br) WWorld.moveBoat(br, d.boats[k].x, d.boats[k].y);
+      }
+    }
+    player.boat = null;
+    if (d.boat) {
+      var aboard = WWorld.boatById(d.boat);
+      if (aboard && boatFree(player.x, player.y)) {
+        player.boat = aboard;
+        aboard.prop._inUse = true;
+      }
     }
     /* flags + vistas */
     var k;
@@ -284,7 +301,9 @@ window.WGame = (function () {
       inv: WAction.inventory,
       giftsToday: WAction.giftDay,
       lampLit: WStory.lampLit,
-      vistas: vistas
+      vistas: vistas,
+      boat: player.boat ? player.boat.id : null,
+      boats: WWorld.boats.map(function (r) { return { id: r.id, x: r.prop.x, y: r.prop.y }; })
     };
     var ok = WU.save(SAVE_KEY, data);
     if (!silent) WHUD.toast(ok ? 'Đã lưu.' : 'Không lưu được ở đây (file:// có thể chặn bộ nhớ).');
@@ -349,17 +368,38 @@ window.WGame = (function () {
            !WWorld.solidAt(px - 8, py + 2) && !WWorld.solidAt(px + 8, py + 2);
   }
 
+  /* afloat = the whole foot-box on water; pier planks read as land, so the
+     hull bumps the decking instead of gliding over it */
+  function boatFree(px, py) {
+    return WWorld.waterAt(px - 8, py - 8) && WWorld.waterAt(px + 8, py - 8) &&
+           WWorld.waterAt(px - 8, py + 2) && WWorld.waterAt(px + 8, py + 2);
+  }
+
   function updatePlayer(dt) {
     var ax = WInput.axis();
     player.moving = !!(ax.x || ax.y);
     if (player.moving) {
       if (Math.abs(ax.x) >= Math.abs(ax.y)) player.dir = ax.x > 0 ? 'right' : 'left';
       else player.dir = ax.y > 0 ? 'down' : 'up';
-      var nx = player.x + ax.x * player.speed * dt;
-      if (boxFree(nx, player.y)) player.x = nx;
-      var ny = player.y + ax.y * player.speed * dt;
-      if (boxFree(player.x, ny)) player.y = ny;
+      var free = player.boat ? boatFree : boxFree;
+      var spd = player.boat ? 62 : player.speed;   // oars are slower than legs
+      var nx = player.x + ax.x * spd * dt;
+      if (free(nx, player.y)) player.x = nx;
+      var ny = player.y + ax.y * spd * dt;
+      if (free(player.x, ny)) player.y = ny;
       player.walkT += dt;
+      if (player.boat) {
+        /* oar-stroke wake: a soft white fleck slides off the stern */
+        var wt = (player.walkT * 2.4) | 0;
+        if (wt !== lastStep && window.WParticles) {
+          lastStep = wt;
+          WParticles.emit('dust',
+            player.x + WU.rand(-10, 10), player.y + 2,
+            { vx: WU.rand(-4, 4), vy: WU.rand(4, 12), life: WU.rand(0.4, 0.7),
+              size: 1.5, color: 'rgba(235,245,250,0.7)' });
+        }
+        return;
+      }
       /* footfall on every second walk-frame toggle (~2.7 steps/s): the synth
          'footstep' blip + a puff of dust underfoot — both systems already
          existed, so this is near-zero cost feedback for a walk-and-talk */
@@ -387,9 +427,55 @@ window.WGame = (function () {
     return Math.sqrt(dx * dx + dy * dy);
   }
 
+  /* where the boat can put you ashore: a walkable (incl. pier) spot reached
+     by pressing toward land — facing direction preferred */
+  var SHORE_DIRS = [{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 }];
+  function shoreSpot() {
+    var dirs = SHORE_DIRS.slice();
+    var f = { up: 0, down: 1, left: 2, right: 3 }[player.dir];
+    dirs.unshift(dirs.splice(f, 1)[0]);      // try the way you face first
+    for (var i = 0; i < dirs.length; i++) {
+      for (var r = 26; r <= 64; r += 6) {
+        var tx = player.x + dirs[i].x * r, ty = player.y + dirs[i].y * r;
+        if (!WWorld.waterAt(tx, ty) && boxFree(tx, ty)) return { x: tx, y: ty };
+      }
+    }
+    return null;
+  }
+
+  function boardBoat(id) {
+    if (player.boat) return;
+    var rec = WWorld.boatById(id);
+    if (!rec) return;
+    var p = WWorld.boatBoardPoint(rec);
+    if (!p) { WHUD.toast('Xuồng không nổi được ở đây.'); return; }
+    player.x = p.x; player.y = p.y;
+    player.boat = rec;
+    rec.prop._inUse = true;
+    WAudio.sfx('splash');
+    WHUD.toast(rec.id === 'boat_sea'
+      ? 'Bạn đẩy xuồng ra biển. E cập bờ khi thấy đất liền.'
+      : 'Bạn đẩy xuồng ra hồ. E cập bờ khi thấy đất liền.');
+  }
+
+  function disembark(spot) {
+    var rec = player.boat;
+    if (!rec) return;
+    WWorld.moveBoat(rec, player.x, player.y);   // the hull stays where you left it
+    rec.prop._inUse = false;
+    player.x = spot.x; player.y = spot.y;
+    player.boat = null;
+    WAudio.sfx('splash');
+  }
+
   function bestInteract() {
     var px = player.x, py = player.y;
     var best = null;
+    if (player.boat) {
+      var shore = shoreSpot();
+      if (shore) return { kind: 'shore', obj: shore, x: shore.x, y: shore.y - 40, label: 'Cập bờ', d: 0 };
+      return null;
+    }
     var n = WNpcs.nearestTo(px, py, 60);
     if (n) {
       best = { kind: 'npc', obj: n, x: n.x, y: n.y - 40,
@@ -414,7 +500,10 @@ window.WGame = (function () {
 
   function doInteract() {
     var b = bestInteract();
-    if (!b) return;
+    if (!b) {
+      if (player.boat) WHUD.toast('Chưa thấy bờ — chèo sát vào hơn.');
+      return;
+    }
     if (b.kind === 'npc') {
       WAudio.sfx('interact');
       if (WDialogue.startForNpc(b.obj)) state = 'DIALOGUE';
@@ -423,13 +512,15 @@ window.WGame = (function () {
       if (WDialogue.active()) state = 'DIALOGUE';
     } else if (b.kind === 'catch') {
       WAction.collect(b.obj);
+    } else if (b.kind === 'shore') {
+      disembark(b.obj);
     }
   }
 
   /* ============================== VISTA ============================== */
 
   function updateVistaTrigger() {
-    if (state !== 'PLAY' || sleepFx.active) return;
+    if (state !== 'PLAY' || sleepFx.active || player.boat) return;
     var v = WWorld.vistaAt(player.x, player.y);
     if (!v) { vinside = false; return; }   // §2: fire on ENTERING the radius
     if (vinside) return;                   // staying inside never re-fires it
@@ -575,7 +666,10 @@ window.WGame = (function () {
 
     if (!sleepFx.active) {
       if (WInput.pressed('interact')) doInteract();
-      if (WInput.pressed('net')) WAction.tryNet(player);
+      if (WInput.pressed('net')) {
+        if (player.boat) WHUD.toast('Lưới không với được từ xuồng.');
+        else WAction.tryNet(player);
+      }
       if (WInput.pressed('fish')) WAction.tryFish(player, WWorld);
       if (WInput.pressed('pause')) { prePause = 'PLAY'; pauseSel = 0; state = 'PAUSE'; }
     }
@@ -780,6 +874,7 @@ window.WGame = (function () {
   }
 
   function drawPlayerBody() {
+    if (player.boat) WWorld.drawBoatHull(ctx, player.x, player.y);
     var frame = player.moving ? 1 + (((player.walkT * 5.5) | 0) % 2) : 0;
     WNpcs.drawChar(ctx, player.x, player.y, player.dir, frame, 0, cam);
     /* wool cloak: white scarf in the rain (cosmetic, §3.2 lost_lamb B) */
@@ -879,6 +974,7 @@ window.WGame = (function () {
   function frame(t) {
     var dt = (t - last) / 1000;
     last = t;
+    if (!isFinite(dt)) dt = 0;   /* a dead timestamp must not NaN the loop dead */
     dt = WU.clamp(dt, 0, 0.05);
     frameState.dt = dt;
     frameState.zoom = zoom;
@@ -904,6 +1000,7 @@ window.WGame = (function () {
     },
     openArcade: openArcade,
     closeArcade: closeArcade,
+    boardBoat: boardBoat,
     state: function () { return state; },
     player: player
   };

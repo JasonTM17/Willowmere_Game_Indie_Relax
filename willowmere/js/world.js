@@ -92,6 +92,7 @@ window.WWorld = (function () {
   var poi = {};
   var vistas = [];
   var interactables = [];
+  var boats = [];         // {id, prop, it, homeX, homeY} — rideable rowboats
   var built = false;
   var frame = 0;
 
@@ -421,6 +422,7 @@ window.WWorld = (function () {
     torches.length = 0;
     vistas.length = 0;
     interactables.length = 0;
+    boats.length = 0;
     for (var pk in poi) if (poi.hasOwnProperty(pk)) delete poi[pk];
     propGrid = new Array(W * H);
     built = false;
@@ -558,9 +560,13 @@ window.WWorld = (function () {
     setPoi('pasture_1', 100, 55); setPoi('pasture_2', 104, 55);
     setPoi('pasture_3', 100, 59); setPoi('pasture_4', 104, 59);
 
-    /* rowboat moored by the pier */
-    addBC('boat', 77, 43, 2, 1, 'props', false);
+    /* rowboat moored by the pier — rideable, carries you out on the lake */
+    var lakeBoatProp = addBC('boat', 77, 43, 2, 1, 'props', false);
     setPoi('boat', 77, 43);
+    /* a second skiff beached where the south trail meets the sand — this one
+       is the only way out onto the sea */
+    var seaBoatProp = addBC('boat', 24, 85, 2, 1, 'props', false);
+    setPoi('boat_sea', 24, 85);
 
     /* nap tree on the hills */
     addBC('pine', 109, 62, 2, 3, 'decor', true);
@@ -718,6 +724,28 @@ window.WWorld = (function () {
     interactables.push(makeInteractable('pier_end', 75, 44, 'Ngắm hồ', pierEndUse));
     interactables.push(makeInteractable('arcade_cabinet', 31, 57, 'Chơi chiếc tủ cũ', arcadeUse));
     solid[idx(31, 57)] = 1;                       // the cabinet blocks its tile
+
+    /* rideable rowboats — the prompt follows the hull wherever you moor it */
+    var boatDefs = [
+      { id: 'boat_lake', prop: lakeBoatProp, label: 'Chèo xuồng ra hồ' },
+      { id: 'boat_sea', prop: seaBoatProp, label: 'Chèo xuồng ra biển' }
+    ];
+    for (var bd = 0; bd < boatDefs.length; bd++) {
+      (function (def) {
+        var rec = { id: def.id, prop: def.prop, homeX: def.prop.x, homeY: def.prop.y };
+        var it = {
+          id: def.id, label: def.label,
+          x: def.prop.x - 64, y: def.prop.y - 40, w: 128, h: 72,
+          onUse: function (game) {
+            var g = game || window.WGame;
+            if (g && typeof g.boardBoat === 'function') g.boardBoat(rec.id);
+          }
+        };
+        rec.it = it;
+        boats.push(rec);
+        interactables.push(it);
+      })(boatDefs[bd]);
+    }
 
     /* 14. torches (night glow sources) */
     for (l = 0; l < lampTiles.length; l++) {
@@ -883,6 +911,102 @@ window.WWorld = (function () {
 
   function useNearest(px, py, game) {
     return useInteractable(nearestInteractable(px, py), game);
+  }
+
+  /* ============================== BOATS ============================== */
+
+  /* propGrid registers a prop under the tiles its bounds cover — a moved
+     prop must be re-registered or it draws only when its old cell is in view */
+  function propCellRange(p) {
+    var x0, y0, x1, y1;
+    if (p.anchor === 'tl') {
+      x0 = p.x; y0 = p.y; x1 = p.x + p.w; y1 = p.y + p.h;
+    } else {
+      x0 = p.x - p.w / 2; x1 = p.x + p.w / 2;
+      y0 = p.y - p.h; y1 = p.y;
+    }
+    return {
+      gx0: clamp(Math.floor(x0 / TILE), 0, W - 1),
+      gx1: clamp(Math.floor((x1 - 0.01) / TILE), 0, W - 1),
+      gy0: clamp(Math.floor(y0 / TILE), 0, H - 1),
+      gy1: clamp(Math.floor((y1 - 0.01) / TILE), 0, H - 1)
+    };
+  }
+
+  function relocateProp(p, nx, ny) {
+    var pi = props.indexOf(p);
+    if (pi < 0) { p.x = nx; p.y = ny; return; }
+    var old = propCellRange(p);
+    p.x = nx; p.y = ny;
+    var neu = propCellRange(p);
+    var gy, gx, cell, k;
+    for (gy = old.gy0; gy <= old.gy1; gy++) {
+      for (gx = old.gx0; gx <= old.gx1; gx++) {
+        cell = propGrid[idx(gx, gy)];
+        if (cell) { k = cell.indexOf(pi); if (k >= 0) cell.splice(k, 1); }
+      }
+    }
+    for (gy = neu.gy0; gy <= neu.gy1; gy++) {
+      for (gx = neu.gx0; gx <= neu.gx1; gx++) {
+        cell = propGrid[idx(gx, gy)];
+        if (!cell) { cell = []; propGrid[idx(gx, gy)] = cell; }
+        if (cell.indexOf(pi) < 0) cell.push(pi);
+      }
+    }
+  }
+
+  function boatById(id) {
+    for (var i = 0; i < boats.length; i++) if (boats[i].id === id) return boats[i];
+    return null;
+  }
+
+  /* where you stand (float) when you climb in — the first spot near the hull
+     whose foot-box is entirely on water */
+  function boatBoardPoint(rec) {
+    var px = rec.prop.x, py = rec.prop.y;
+    var dys = [0, 8, 16, -8, 24, -16, 32, -24];
+    var dxs = [0, 8, -8, 16, -16, 24, -24, 32, -32];
+    for (var i = 0; i < dys.length; i++) {
+      for (var j = 0; j < dxs.length; j++) {
+        var x = px + dxs[j], y = py + dys[i];
+        if (waterAt(x - 8, y - 8) && waterAt(x + 8, y - 8) &&
+            waterAt(x - 8, y + 2) && waterAt(x + 8, y + 2)) {
+          return { x: x, y: y };
+        }
+      }
+    }
+    return null;
+  }
+
+  /* park the hull at (nx,ny) — grid re-registered, prompt follows */
+  function moveBoat(rec, nx, ny) {
+    if (!rec || !rec.prop) return;
+    relocateProp(rec.prop, nx, ny);
+    rec.it.x = nx - 64; rec.it.y = ny - 40;
+    rec.it.w = 128; rec.it.h = 72;
+  }
+
+  /* the boat you stand in, drawn under the feet so the sprite reads as
+     riding inside — same timber palette as the moored prop */
+  function drawBoatHull(ctx, x, y) {
+    ctx.fillStyle = '#7a5c3a';
+    ctx.beginPath();
+    ctx.moveTo(x - 24, y - 10);
+    ctx.quadraticCurveTo(x, y - 2, x + 24, y - 10);
+    ctx.quadraticCurveTo(x, y + 6, x - 24, y - 10);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#5c4227';
+    ctx.beginPath();
+    ctx.moveTo(x - 18, y - 9);
+    ctx.quadraticCurveTo(x, y - 3, x + 18, y - 9);
+    ctx.quadraticCurveTo(x, y - 1, x - 18, y - 9);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(46,32,18,0.6)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x - 24, y - 10);
+    ctx.quadraticCurveTo(x, y - 2, x + 24, y - 10);
+    ctx.stroke();
   }
 
   /* ============================== CLOCK / VIEW ============================== */
@@ -1815,7 +1939,7 @@ window.WWorld = (function () {
         if (!cell) continue;
         for (var k = 0; k < cell.length; k++) {
           var p = props[cell[k]];
-          if (p._f === frame) continue;
+          if (p._f === frame || p._inUse) continue;
           p._f = frame;
           var bx0 = p.anchor === 'tl' ? p.x : p.x - p.w / 2;
           var by0 = p.anchor === 'tl' ? p.y : p.y - p.h;
@@ -2139,6 +2263,12 @@ window.WWorld = (function () {
     interactables: interactables,
     torches: torches,
     hooks: {}, // later stages may override per-id: WWorld.hooks.door_lighthouse = fn
+
+    boats: boats,
+    boatById: boatById,
+    boatBoardPoint: boatBoardPoint,
+    moveBoat: moveBoat,
+    drawBoatHull: drawBoatHull,
 
     vistaAt: vistaAt,
     markVistaSeen: markVistaSeen,
