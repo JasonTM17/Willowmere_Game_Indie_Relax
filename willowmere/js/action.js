@@ -721,7 +721,7 @@ window.WAction = (function () {
     e.flash = 0.14;
     if (window.WParticles) {
       WParticles.emit('floattext', e.x, e.y - 20,
-        { text: '−1', color: 'rgba(255,122,108,1)', life: 0.8 });
+        { text: '−' + (dmg || 1), color: 'rgba(255,122,108,1)', life: 0.8 });
     }
     if (e.hp <= 0) {
       var i = enemies.indexOf(e);
