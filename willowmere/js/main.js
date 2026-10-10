@@ -52,6 +52,7 @@ window.WGame = (function () {
   var faintFx = { active: false, phase: 0, t: 0 };
   var hurtFx = 0;              // red vignette seconds-left after taking a hit
   var shakeT = 0;              // camera shake seconds-left — same trigger
+  var dayCard = { t: 0, day: 1 }; // "— Ngày N —" morning title card
   var regenT = 45;             // one heart quietly mends every 45 s of play
 
   /* ============================== BOOT ============================== */
@@ -381,6 +382,8 @@ window.WGame = (function () {
     } else if (sleepFx.phase === 1 && sleepFx.t >= 1) {
       sleepFx.active = false;
       env.frozen = false;
+      dayCard.t = 3.2;             // wake to a proper title card, not just a toast
+      dayCard.day = env.day;
     }
   }
 
@@ -785,6 +788,7 @@ window.WGame = (function () {
     }
     if (hurtFx > 0) hurtFx -= dt;
     if (shakeT > 0) shakeT -= dt;
+    if (dayCard.t > 0) dayCard.t -= dt;
     clearExpiredRain();
     syncEnv();
 
@@ -1164,6 +1168,34 @@ window.WGame = (function () {
       lg.addColorStop(1, 'rgba(150,26,30,' + la.toFixed(3) + ')');
       ctx.fillStyle = lg;
       ctx.fillRect(0, 0, vw, vh);
+    }
+
+    /* morning title card — "Ngày N" breathes once over the fresh day */
+    if (dayCard.t > 0) {
+      var dc = 3.2 - dayCard.t;                       // age
+      var da = Math.min(1, dc / 0.6, dayCard.t / 0.9);
+      ctx.globalAlpha = Math.max(0, da);
+      ctx.textAlign = 'center';
+      ctx.font = 'italic 44px "Times New Roman",serif';
+      ctx.shadowColor = 'rgba(10,12,18,0.9)';
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = '#f6ecd2';
+      try { ctx.letterSpacing = '6px'; } catch (e) { /* older canvas: no spacing */ }
+      ctx.fillText('Ngày ' + dayCard.day, vw / 2, vh * 0.42);
+      try { ctx.letterSpacing = '0px'; } catch (e) { /* restore */ }
+      ctx.shadowBlur = 0;
+      ctx.font = 'italic 16px "Times New Roman",serif';
+      ctx.fillStyle = 'rgba(246,236,210,0.75)';
+      ctx.fillText(env.weather === 'rain' ? 'mưa rơi trên mái làng' : 'một ngày mới ở Willowmere',
+        vw / 2, vh * 0.42 + 30);
+      var lw = 60 + Math.min(1, dc / 1.2) * 80;       // rule grows as it settles
+      ctx.strokeStyle = 'rgba(255,222,150,' + (da * 0.8).toFixed(3) + ')';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(vw / 2 - lw, vh * 0.42 - 34);
+      ctx.lineTo(vw / 2 + lw, vh * 0.42 - 34);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
     }
 
     /* sleep fade */
