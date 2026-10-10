@@ -655,7 +655,8 @@ window.WGame = (function () {
     vista.t += dt;
     if (vista.t > 0.7) {
       var ax = WInput.axis();
-      var leave = !!(ax.x || ax.y) || WInput.down('net') || WInput.down('fish');
+      var leave = !!(ax.x || ax.y) || WInput.down('net') || WInput.down('fish') ||
+                  WInput.pressed('interact') || WInput.pressed('attack');
       if (leave || vista.t > 3.5) {   // ~3 s of panorama, then back to play
         var v = vista;
         vista = null;
