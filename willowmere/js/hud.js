@@ -67,6 +67,7 @@ window.WHUD = (function () {
 
   /* ---- Tab opens the pouch, B opens the journal (HUD-internal toggles) -- */
   function onKey(e) {
+    if (e.repeat) return;            // held keys must not strobe the overlay
     var g = window.WGame;
     var playing = g && typeof g.state === 'function' && g.state() === 'PLAY';
     if (e.code === 'Tab') {
