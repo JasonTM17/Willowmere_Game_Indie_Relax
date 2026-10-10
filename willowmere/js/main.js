@@ -74,7 +74,7 @@ window.WGame = (function () {
     syncEnv();
     zoomTgt = 0.8;           // title backdrop: gentle pull-back over the green
 
-    hasSave = !!readSave();
+    hasSave = anySaveExists();
     WAssets.load();          // background; placeholders render until settled
 
     /* sleep offer via hook (overrides world's direct sleep call) */
@@ -168,7 +168,7 @@ window.WGame = (function () {
   function toTitle() {
     state = 'TITLE';
     titleSel = 0;
-    hasSave = !!readSave();
+    hasSave = anySaveExists();
     env.hour = 18.4;
     env.frozen = false;
     if (player.boat) { player.boat.prop._inUse = false; player.boat = null; }
@@ -215,7 +215,7 @@ window.WGame = (function () {
 
   function continueGame() {
     var d = readSave();
-    if (!d) { WHUD.toast('Không đọc được file lưu.'); return; }
+    if (!d) { WHUD.toast('File lưu cũ hoặc hỏng — không đọc được. Chơi mới nhé.'); return; }
     WStory.reset();
     WAction.reset();
     WWorld.build();
@@ -295,6 +295,15 @@ window.WGame = (function () {
     var d = WU.load(SAVE_KEY);
     if (!d || typeof d !== 'object' || d.v !== 1) return null;
     return d;
+  }
+
+  /* a corrupt/old-version save still deserves the "Chơi tiếp" entry —
+     picking it then explains the file can't be read, instead of the
+     option silently vanishing */
+  function anySaveExists() {
+    if (readSave()) return true;
+    try { return !!window.localStorage.getItem(SAVE_KEY); }
+    catch (e) { return false; }
   }
 
   function saveGame(silent) {
@@ -1061,6 +1070,7 @@ window.WGame = (function () {
 
     if (state === 'TITLE') {
       WHUD.drawTitleOn(ctx, titleSel, hasSave);
+      if (WHUD.drawToasts) WHUD.drawToasts(ctx, frameState.dt || 1 / 60, vw, vh);
     } else if (state === 'VISTA' && vista) {
       WHUD.drawVistaOn(ctx, vista.v, Math.min(1, vista.t / 1.2));
     } else if (state === 'PAUSE') {

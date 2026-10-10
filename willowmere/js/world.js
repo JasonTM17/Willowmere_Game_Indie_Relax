@@ -628,6 +628,12 @@ window.WWorld = (function () {
     for (i = 0; i < W * H; i++) {
       if (water[i] && !pier[i]) solid[i] = 1;
     }
+    /* most 'bc' props block only their anchor tile — the trunk. The wide
+       sprites below visibly reach the ground across several tiles though
+       (a willow copse, a two-tile boulder), so their footprint gets the
+       flank tiles too. path/trail/pier stay walkable: a low bough may
+       overhang a lane, but it can never seal it. */
+    var BC_FOOT_EXTRA = { willow_big: [-1, 1], rock_big: [-1, 1] };
     for (var pp = 0; pp < props.length; pp++) {
       var prop = props[pp];
       if (!prop.solid) continue;
@@ -637,6 +643,16 @@ window.WWorld = (function () {
         var ptx = Math.round((prop.x - TILE / 2) / TILE);
         var pty = Math.round((prop.y - TILE) / TILE);
         if (inMap(ptx, pty)) solid[idx(ptx, pty)] = 1;
+        var extra = BC_FOOT_EXTRA[prop.kind];
+        if (extra) {
+          for (var fi = 0; fi < extra.length; fi++) {
+            var ftx = ptx + extra[fi];
+            if (inMap(ftx, pty) &&
+                !path[idx(ftx, pty)] && !trail[idx(ftx, pty)] && !pier[idx(ftx, pty)]) {
+              solid[idx(ftx, pty)] = 1;
+            }
+          }
+        }
       }
     }
 

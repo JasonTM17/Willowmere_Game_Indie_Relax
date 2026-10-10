@@ -521,25 +521,7 @@ window.WHUD = (function () {
     }
 
     /* toasts (soft entrance: 180 ms fade + slide, soft exit over the tail) */
-    var ty = vh - 68;
-    for (i = toasts.length - 1; i >= 0; i--) {
-      var t = toasts[i];
-      t.t -= dt;
-      if (t.t <= 0) { toasts.splice(i, 1); continue; }
-      ctx.font = font(13);
-      var twd = ctx.measureText(t.text).width + 34;
-      var age = t.total - t.t;
-      var aIn = Math.min(1, age / 180);
-      var a = Math.min(aIn, t.t / 400);
-      ctx.globalAlpha = a;
-      var dy = (1 - aIn) * 6;
-      panel(ctx, vw / 2 - twd / 2, ty - 26 + dy, twd, 30, { radius: 15, accent: true });
-      ctx.fillStyle = '#f6eeda';
-      ctx.textAlign = 'center';
-      ctx.fillText(t.text, vw / 2 + 3, ty - 6 + dy);
-      ctx.globalAlpha = 1;
-      ty -= 38;
-    }
+    drawToasts(ctx, dt, vw, vh);
 
     /* interaction prompt: "E — …" over the nearest target, gentle bob */
     if (prompt) {
@@ -557,6 +539,29 @@ window.WHUD = (function () {
     }
 
     if (bagOpen) drawBag(ctx, vw, vh);
+  }
+
+  /* toasts also need a home on screens that skip the HUD (title) */
+  function drawToasts(ctx, dt, vw, vh) {
+    var ty = vh - 68;
+    for (var i = toasts.length - 1; i >= 0; i--) {
+      var t = toasts[i];
+      t.t -= dt;
+      if (t.t <= 0) { toasts.splice(i, 1); continue; }
+      ctx.font = font(13);
+      var twd = ctx.measureText(t.text).width + 34;
+      var age = t.total - t.t;
+      var aIn = Math.min(1, age / 180);
+      var a = Math.min(aIn, t.t / 400);
+      ctx.globalAlpha = a;
+      var dy = (1 - aIn) * 6;
+      panel(ctx, vw / 2 - twd / 2, ty - 26 + dy, twd, 30, { radius: 15, accent: true });
+      ctx.fillStyle = '#f6eeda';
+      ctx.textAlign = 'center';
+      ctx.fillText(t.text, vw / 2 + 3, ty - 6 + dy);
+      ctx.globalAlpha = 1;
+      ty -= 38;
+    }
   }
 
   /* ---- Title ---- */
@@ -657,7 +662,7 @@ window.WHUD = (function () {
     buttons.length = 0;
     ctx.fillStyle = 'rgba(8,10,16,0.55)';
     ctx.fillRect(0, 0, vw, vh);
-    var w = 340, h = 320;
+    var w = 340, h = 348;
     var x = vw / 2 - w / 2, y = vh / 2 - h / 2;
     panel(ctx, x, y, w, h);
     ctx.textAlign = 'center';
@@ -684,6 +689,10 @@ window.WHUD = (function () {
     for (var i = 0; i < items.length; i++) {
       button(ctx, items[i].label, x + 40, y + 70 + i * 50, w - 80, 40, i === sel, false, items[i].id);
     }
+    ctx.font = font(11);
+    ctx.fillStyle = 'rgba(242,234,216,0.7)';
+    ctx.fillText('WASD di chuyển \u00b7 E tương tác \u00b7 Q lưới \u00b7 F câu', vw / 2, y + h - 54);
+    ctx.fillText('J gậy \u00b7 click nỏ \u00b7 Tab túi \u00b7 Esc tạm dừng', vw / 2, y + h - 36);
     ctx.font = font(11, false, true);
     ctx.fillStyle = 'rgba(242,234,216,0.55)';
     ctx.fillText('Tiến trình cũng được lưu khi bạn ngủ.', vw / 2, y + h - 14);
@@ -859,6 +868,7 @@ window.WHUD = (function () {
     drawEpilogueOn: drawEpilogueOn,
     buttons: function () { return buttons; },
     clearToasts: function () { toasts.length = 0; },
+    drawToasts: drawToasts,
     /* full game-switch reset (New Game / Continue / Quit): quest-transition
        snapshot, rain watcher and the bag overlay must not leak between runs */
     resetWatchers: function () {

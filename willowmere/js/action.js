@@ -138,6 +138,7 @@ window.WAction = (function () {
   var motes = [];         // {x, y, seed} — alive cap 12
   var projs = [];         // slingshot pebbles in flight — cap 8
   var swingT = 0;         // net-swing arc timer (Q) — not the staff
+  var swingDir = 'down';  // facing locked at the Q press, for the arc draw
   var spawnT = 1, moteT = 2;
   var lastEnv = null;
   var aim = null;         // {x,y} world point under cursor (set by main)
@@ -196,7 +197,11 @@ window.WAction = (function () {
   function eat(key) {
     var it = ITEMS[key];
     var pl = lastEnv && lastEnv.player;
-    if (!it || it.kind !== 'food' || count(key) <= 0) return false;
+    if (!it || count(key) <= 0) return false;
+    if (it.kind !== 'food') {
+      if (window.WHUD) WHUD.toast('Cái này không ăn được đâu.');
+      return false;
+    }
     if (!pl || pl.hp >= (pl.maxHp || 3)) {
       if (window.WHUD) WHUD.toast('Bụng còn no lắm.');
       return false;
@@ -416,6 +421,7 @@ window.WAction = (function () {
 
   function tryNet(player) {
     swingT = 0.22;
+    swingDir = player.dir;
     WAudio.sfx('net');
     var v = DIRV[player.dir] || DIRV.down;
     var cx = player.x + v[0] * NET_PUSH;
@@ -1054,7 +1060,7 @@ window.WAction = (function () {
     ctx.translate(-Math.round(cam.x), -Math.round(cam.y));
     /* net swing arc */
     if (swingT > 0) {
-      var v = DIRV[player.dir] || DIRV.down;
+      var v = DIRV[swingDir] || DIRV.down;
       var base = Math.atan2(v[1], v[0]);
       var t = 1 - swingT / 0.22;
       ctx.strokeStyle = 'rgba(250,246,230,' + (0.75 * (1 - t) + 0.15).toFixed(3) + ')';
