@@ -499,11 +499,17 @@ window.WHUD = (function () {
     ctx.fillStyle = 'rgba(8,10,16,0.45)';
     ctx.fillRect(0, 0, vw, vh);
 
-    var rh = 22, colW = 272;
+    var rh = 22;
+    var colW = Math.min(272, Math.max(150, Math.floor((vw - 80) / 2)));
     var w = colW * 2 + 56;
     var rightRows = vrs.length + keeps.length + 4; // section heads + gaps
-    var h = 100 + Math.max(rows.length, rightRows) * rh;
-    var x = Math.round(vw / 2 - w / 2), y = Math.round(vh / 2 - h / 2);
+    var maxRows = Math.max(rows.length, rightRows);
+    var h = 100 + maxRows * rh;
+    /* tight windows squeeze row spacing rather than bleed the panel off-
+       screen; each row is a single text line, so smaller gaps stay tidy */
+    if (h > vh - 20) { rh = Math.max(14, Math.floor((vh - 120) / maxRows)); h = 100 + maxRows * rh; }
+    var x = Math.max(8, Math.round(vw / 2 - w / 2));
+    var y = Math.max(6, Math.round(vh / 2 - h / 2));
     panel(ctx, x, y, w, h, { accent: true });
 
     ctx.textAlign = 'center';
