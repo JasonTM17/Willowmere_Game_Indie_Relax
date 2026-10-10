@@ -173,6 +173,13 @@ window.WStory = (function () {
     if (npcId === 'junie' && flag('junie_palette') && !flag('junie_palette_said')) {
       return 'junie_palette';
     }
+    /* B4 — the keeper's staff: after his confession resolves, Marlow hands
+       over the stick that carried him up the lamp stairs (WAction reads
+       keeper_staff live: longer reach, wider arc, hits for 2) */
+    if (npcId === 'marlow' && isDone(QUESTS.keeper_regret) && !flag('keeper_staff')) {
+      if (window.WHUD) WHUD.toast('Marlow đưa cho bạn Gậy Giữ Đèn \u2014 vung xa và nặng hơn.');
+      return 'marlow_staff';
+    }
     return null;
   }
 
@@ -640,6 +647,11 @@ window.WStory = (function () {
     m.q_keeper_done_a = N('marlow', '\u2026Không à? Hm. Có lẽ lỗi vốn chỉ là của riêng ta giữ. Cảm ơn, Quản lý.');
     m.q_keeper_done_b = N('marlow', 'Mưa như sắt. Trang nhật ký của ta nằm trong một bưu kiện đâu đó \u2014 phần còn lại của câu chuyện.');
     m.q_truth_told = N('marlow', 'Họ VÀO BẾN được à? (Ông bật cười một tiếng, như một sợi dây được tháo nút.) Đi thôi \u2014 ngọn đèn không tự thắp đâu.');
+    /* B4 — keeper staff hand-off (talkBonusNode fires this once) */
+    m.marlow_staff = N('marlow', 'Cây gậy này chống ta lên cầu thang đèn mười lăm năm. Cán vẫn ấm lửa \u2014 cầm lấy, đêm dài cần một tay chắc.', {
+      setFlags: { keeper_staff: 1 }, next: 'marlow_staff_done'
+    });
+    m.marlow_staff_done = N('marlow', 'Vung rộng hơn, nện nặng hơn. Chỉ nhớ một điều ta đã quên: đừng để bóng nào qua được.');
 
     /* ---- climb branch: B2 (the truth) resolves first, then B1 (the keeper).
        When the truth is already known and untold, climb_menu offers it and

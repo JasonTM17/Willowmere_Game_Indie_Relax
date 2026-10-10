@@ -655,7 +655,11 @@ window.WAction = (function () {
 
   var ENEMY_DEFS = {
     wisp: { hp: 2, speed: 46, r: 9, aggro: 150, drop: 'mote', hours: [20, 5] },
-    crab: { hp: 3, speed: 32, r: 10, aggro: 110, drop: 'critter_sand_crab', hours: [7, 18] }
+    crab: { hp: 3, speed: 32, r: 10, aggro: 110, drop: 'critter_sand_crab', hours: [7, 18] },
+    /* u linh già — an older, heavier shadow. From day 8 some night spawns
+       come up elder instead: tougher, faster, wider-eyed, worth 2 motes.
+       It dies with the lamp like every held-back light. */
+    elder: { hp: 4, speed: 56, r: 11, aggro: 180, drop: 'mote', dropN: 2, hours: [20, 5] }
   };
   var enemies = [];
   var enemyT = 5;
@@ -669,6 +673,13 @@ window.WAction = (function () {
      outT = the stick stays drawn while foes linger nearby */
   var weapon = { swingT: 0, cd: 0, outT: 0, dir: 'down' };
   var SWING_CD = 0.42, SWING_DUR = 0.26, SWING_R = 34, SWING_ARC = 1.15;
+  /* keeper_staff (Marlow's gift, keeper_regret done): a longer reach,
+     a wider arc, hits for 2 — the flag is read live so a save loaded
+     mid-swing upgrades cleanly */
+  var KEEPER_R = 44, KEEPER_ARC = 1.32;
+  function keeperUp() {
+    return !!(window.WStory && WStory.flag && WStory.flag('keeper_staff'));
+  }
 
   function enemyWalkable(x, y) {
     return !WWorld.solidAt(x, y - 4) && !WWorld.solidAt(x, y + 4) &&
@@ -691,9 +702,12 @@ window.WAction = (function () {
     var kind = null;
     if (inHours(h, ENEMY_DEFS.crab.hours) && biome === 'beach') kind = 'crab';
     else if (inHours(h, ENEMY_DEFS.wisp.hours) &&
-             (biome === 'forest' || biome === 'hills' || biome === 'headland')) kind = 'wisp';
+             (biome === 'forest' || biome === 'hills' || biome === 'headland' || biome === 'meadow')) {
+      /* day 8+: some night shadows come up elder instead */
+      kind = (env.day >= 8 && WU.chance(0.25)) ? 'elder' : 'wisp';
+    }
     /* once the lamp burns, the held-back shadows are free — none return */
-    if (kind === 'wisp' && window.WStory && WStory.flag('lampLit')) return;
+    if ((kind === 'wisp' || kind === 'elder') && window.WStory && WStory.flag('lampLit')) return;
     if (!kind || enemies.length >= 6 || !enemyWalkable(x, y)) return;
     enemies.push(makeEnemy(kind, x, y));
   }
@@ -713,11 +727,11 @@ window.WAction = (function () {
       var i = enemies.indexOf(e);
       if (i >= 0) enemies.splice(i, 1);
       burst(e.x, e.y - 8, 'sparkle', 10);
-      if (e.def.drop) add(e.def.drop, 1);
-      if (e.kind === 'wisp' && window.WParticles) {
+      if (e.def.drop) add(e.def.drop, e.def.dropN || 1);
+      if ((e.kind === 'wisp' || e.kind === 'elder') && window.WParticles) {
         WParticles.emit('mote', e.x, e.y - 10, {});   // the freed light, drifting
       }
-      WAudio.sfx(e.kind === 'wisp' ? 'sparkle' : 'pop');
+      WAudio.sfx(e.kind === 'crab' ? 'pop' : 'sparkle');
     } else {
       WAudio.sfx('hit');
     }
@@ -826,16 +840,19 @@ window.WAction = (function () {
     WAudio.sfx('swing');
     var v = DIRV[player.dir] || DIRV.down;
     var base = Math.atan2(v[1], v[0]);
+    var up = keeperUp();
+    var reach = up ? KEEPER_R : SWING_R;
+    var arc = up ? KEEPER_ARC : SWING_ARC;
     var hit = false;
     for (var i = enemies.length - 1; i >= 0; i--) {
       var e = enemies[i];
       var dx = e.x - player.x, dy = e.y - (player.y - 10);
       var d = Math.sqrt(dx * dx + dy * dy);
-      if (d > SWING_R + e.def.r) continue;
+      if (d > reach + e.def.r) continue;
       var da = Math.atan2(Math.sin(Math.atan2(dy, dx) - base),
                         Math.cos(Math.atan2(dy, dx) - base));
-      if (Math.abs(da) > SWING_ARC) continue;
-      hurtEnemy(e, player.x, player.y);
+      if (Math.abs(da) > arc) continue;
+      hurtEnemy(e, player.x, player.y, up ? 2 : 1);
       hit = true;
     }
     if (window.WStory && !WStory.flag('staff_hint_shown')) {
@@ -862,6 +879,26 @@ window.WAction = (function () {
       ctx.fillStyle = blink ? '#4a3f7a' : '#cfe8ff';
       ctx.fillRect(e.x - 3.4, cy - 1.5, 2, 2);
       ctx.fillRect(e.x + 1.4, cy - 1.5, 2, 2);
+    } else if (e.kind === 'elder') {
+      var ecy = e.y - 17 + bob;
+      /* u linh già: bigger, indigo-dark, ember eyes, three trailing tapers */
+      ctx.globalAlpha = blink ? 0.85 : 0.55;
+      ctx.fillStyle = 'rgba(96,80,196,0.55)';
+      ctx.beginPath(); ctx.arc(e.x, ecy, 17, 0, WU.TAU); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = blink ? '#efe8ff' : '#241f4a';
+      ctx.beginPath(); ctx.arc(e.x, ecy, 9.5, 0, WU.TAU); ctx.fill();
+      ctx.beginPath();                              // ragged hem
+      ctx.moveTo(e.x - 7, ecy + 4);
+      ctx.lineTo(e.x - 4.5, ecy + 13);
+      ctx.lineTo(e.x - 1.5, ecy + 5);
+      ctx.lineTo(e.x + 1.5, ecy + 13);
+      ctx.lineTo(e.x + 4.5, ecy + 5);
+      ctx.lineTo(e.x + 7, ecy + 11);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = blink ? '#5a3f2a' : '#ffc46a';
+      ctx.fillRect(e.x - 4.4, ecy - 2, 2.4, 2.4);
+      ctx.fillRect(e.x + 2, ecy - 2, 2.4, 2.4);
     } else {
       /* crab: shadow, scuttling legs, shell, claws, eye stalks */
       ctx.fillStyle = 'rgba(0,0,0,0.18)';
@@ -910,22 +947,33 @@ window.WAction = (function () {
     } else {
       ang = b + 1.05;                           // rest: along the shoulder
     }
+    var up = keeperUp();
     ctx.save();
     ctx.translate(hx, hy);
     ctx.rotate(ang);
     ctx.lineCap = 'round';
-    ctx.strokeStyle = '#7a5430';
+    ctx.strokeStyle = up ? '#8a5c22' : '#7a5430';
     ctx.lineWidth = 3.4;
     ctx.beginPath(); ctx.moveTo(-7, 0); ctx.lineTo(17, 0); ctx.stroke();
-    ctx.strokeStyle = '#caa06a';
+    ctx.strokeStyle = up ? '#f2c96e' : '#caa06a';
     ctx.lineWidth = 1.1;
     ctx.beginPath(); ctx.moveTo(-7, -1.1); ctx.lineTo(17, -1.1); ctx.stroke();
+    if (up) {                                   // the lamp-ember at its tip
+      ctx.fillStyle = 'rgba(255,214,120,0.9)';
+      ctx.beginPath(); ctx.arc(17, 0, 2.6, 0, WU.TAU); ctx.fill();
+      ctx.fillStyle = 'rgba(255,244,190,1)';
+      ctx.beginPath(); ctx.arc(17, 0, 1.2, 0, WU.TAU); ctx.fill();
+    }
     ctx.restore();
     if (weapon.swingT > 0) {                    // the arc flash
-      ctx.strokeStyle = 'rgba(255,240,200,' + (0.55 * weapon.swingT / SWING_DUR).toFixed(3) + ')';
+      var hw = up ? KEEPER_ARC : SWING_ARC;
+      var hr = up ? 36 : 30;
+      ctx.strokeStyle = up
+        ? 'rgba(255,214,120,' + (0.7 * weapon.swingT / SWING_DUR).toFixed(3) + ')'
+        : 'rgba(255,240,200,' + (0.55 * weapon.swingT / SWING_DUR).toFixed(3) + ')';
       ctx.lineWidth = 2.5;
       ctx.beginPath();
-      ctx.arc(player.x, player.y - 10, 30, b - 1.15, b + 1.15);
+      ctx.arc(player.x, player.y - 10, hr, b - hw, b + hw);
       ctx.stroke();
     }
   }
