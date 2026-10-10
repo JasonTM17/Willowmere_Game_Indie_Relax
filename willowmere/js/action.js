@@ -452,6 +452,8 @@ window.WAction = (function () {
         fish.state = 'reel';
         fish.reelT = 0;
         fish.markerT = 0;
+        fish.marker = 0.5;   // matches the first updateFish tick (sin 0) so a
+                             // same-frame press resolves instead of NaN-missing
         fish.fishId = pickFish(
           world.biomeAt((fish.bx / world.TILE) | 0, (fish.by / world.TILE) | 0),
           lastEnv ? WU.hnorm(lastEnv.hour) : 12);

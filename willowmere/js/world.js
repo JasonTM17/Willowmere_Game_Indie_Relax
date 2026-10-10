@@ -302,17 +302,22 @@ window.WWorld = (function () {
   }
 
   function hiveUse() {
-    /* `this` is the interactable record */
+    /* `this` is the interactable record; the used-day stamp rides the saved
+       flag pool so a reload can't grant a second comb from the same hive */
     var A = window.WAction;
+    var S = window.WStory;
     var e = envNow();
     var day = e && e.day ? e.day : 1;
-    if (this._usedDay === day) {
+    var key = 'hive_day_' + this.id;
+    var stamped = (S && S.flags && S.flags[key] === day) || this._usedDay === day;
+    if (stamped) {
       toast('Ong vẫn đang làm thêm. Mai quay lại nhé.');
       return;
     }
     if (A && typeof A.add === 'function') {
       A.add('food_honeycomb', 1);
       this._usedDay = day;
+      if (S && typeof S.setFlag === 'function') S.setFlag(key, day);
       toast('Bạn lấy được một miếng tổ ong. Đàn ong vo ve tán thành.');
       blip('pop');
     } else {
@@ -698,7 +703,7 @@ window.WWorld = (function () {
     }
     interactables.push(makeInteractable(
       'seed_glint', 98, 60, 'Nhặt túi hạt giống', seedGlintUse,
-      { notFlags: ['seeds_returned', 'seeds_gifted'] }));
+      { notFlags: ['seed_pouch_found', 'seeds_returned', 'seeds_gifted'] }));
     interactables.push(makeInteractable('notice_board', 37, 49, 'Đọc bảng tin', noticeBoardUse));
     for (s = 0; s < SIGN_DEFS.length; s++) {
       (function (sd, n) {

@@ -542,6 +542,7 @@ window.WStory = (function () {
           setFlags: { finn_big_one: 1 }, next: 'q_big_one_done_a'
         }),
         C('Siltjaw là của hồ, Finn à. Để huyền thoại bơi tiếp đi.', {
+          requires: { flags: ['siltjaw_caught'] },
           setFlags: { siltjaw_freed: 1 }, next: 'q_big_one_done_b'
         })
       ]
@@ -616,7 +617,7 @@ window.WStory = (function () {
       ]
     });
     m.q_colors_done_a = N('junie', 'Willowmere có đủ mọi màu của tôi. Tôi ở lại \u2014 giá vẽ đặt cạnh bến tàu.');
-    m.q_colors_done_b = N('junie', 'Một nghiên cứu về bóng tối\u2026 bức tranh can đảm nhất ở đây. Tôi sẽ viết thư từ thành phố. Tôi sẽ quay lại vì những hồ nước.');
+    m.q_colors_done_b = N('junie', 'Một nghiên cứu về bóng tối\u2026 bức tranh can đảm nhất ở đây. Tôi sẽ viết thư \u2014 và quay lại vì những hồ nước.');
 
     /* ---- keeper_regret (Marlow) — the confession, plus B2 at the confession ---- */
     m.q_keeper_regret_hook = N('marlow', 'Cậu cứ ghé tháp hoài. Nỗi tội cũng vậy. Hôm nào đó, hỏi ta điều gì đi. Không phải hôm nay.', {

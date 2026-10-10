@@ -339,10 +339,14 @@ function main() {
   const env2 = { day: 2, hour: 22.5, weather: 'rain', night: true,
                  frozen: false, player: player };
   step('night+rain pass (full draw chain again, rain + glow branches)', function () {
-    WStory.update(env2);
-    WAction.update(1 / 60, player, env2);
-    WParticles.update(1 / 60, WWorld);
-    drawWorldPass(ctx, env2, cam, player);
+    /* run a handful of frames: a single pass can legitimately emit zero drops
+       (rain spawn is per-frame probabilistic) and flake the assertion */
+    for (var f = 0; f < 12; f++) {
+      WStory.update(env2);
+      WAction.update(1 / 60, player, env2);
+      WParticles.update(1 / 60, WWorld);
+      drawWorldPass(ctx, env2, cam, player);
+    }
     drawScreenUI(ctx, env2);
     if (WParticles.count() === 0) throw new Error('no rain particles alive in a rain pass');
   });

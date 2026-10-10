@@ -468,7 +468,7 @@ window.WDialogue = (function () {
     ctx.stroke();
   }
 
-  function itemIcon(key, x, y) {
+  function itemIcon(ctx, key, x, y) {
     var A = window.WAction;
     if (A && A.ITEMS[key]) {
       var kind = A.ITEMS[key].kind;
@@ -629,7 +629,7 @@ window.WDialogue = (function () {
           ctx.fillStyle = '#cfc6b0';
         }
         hitRects.push({ kind: 'gift', i: i, x: x + 16, y: ry - 14, w: w - 32, h: 22 });
-        itemIcon(key, x + 36, ry - 12);
+        itemIcon(ctx, key, x + 36, ry - 12);
         ctx.textAlign = 'left';
         ctx.fillText(label, x + 56, ry);
       }
