@@ -323,7 +323,7 @@ window.WAction = (function () {
     var c = nearestCritter(px, py, r);
     var m = nearestMote(px, py, r);
     if (c && (!m || WU.dist(px, py, c.x, c.y) <= WU.dist(px, py, m.x, m.y))) {
-      return { kind: 'critter', obj: c, x: c.x, y: c.y, label: 'Catch ' + ITEMS[c.id].name };
+      return { kind: 'critter', obj: c, x: c.x, y: c.y, label: 'Bắt ' + ITEMS[c.id].name };
     }
     if (m) return { kind: 'mote', obj: m, x: m.x, y: m.y, label: 'Hứng ánh sáng' };
     return null;
@@ -617,7 +617,7 @@ window.WAction = (function () {
 
   /* staff state: swingT = the active arc, cd = re-swing lockout,
      outT = the stick stays drawn while foes linger nearby */
-  var weapon = { swingT: 0, cd: 0, outT: 0 };
+  var weapon = { swingT: 0, cd: 0, outT: 0, dir: 'down' };
   var SWING_CD = 0.42, SWING_DUR = 0.26, SWING_R = 34, SWING_ARC = 1.15;
 
   function enemyWalkable(x, y) {
@@ -630,13 +630,13 @@ window.WAction = (function () {
     var def = ENEMY_DEFS[kind];
     return { kind: kind, def: def, hp: def.hp, x: x, y: y,
       wx: x, wy: y, wt: WU.rand(1, 3), kx: 0, ky: 0, kt: 0,
-      flash: 0, seed: WU.rand(0, 6.283) };
+      windT: 0, restT: 0, flash: 0, seed: WU.rand(0, 6.283) };
   }
 
   function spawnEnemy(px, py, env) {
     var h = WU.hnorm(env.hour);
     var night = h >= 20 || h < 5;
-    var ang = WU.rand(0, WU.TAU), d = WU.rand(224, 448);
+    var ang = WU.rand(0, WU.TAU), d = WU.rand(430, 610);   // just past the view edge
     var x = px + Math.cos(ang) * d, y = py + Math.sin(ang) * d;
     var biome = WWorld.biomeAt((x / WWorld.TILE) | 0, (y / WWorld.TILE) | 0);
     var kind = null;
@@ -654,6 +654,7 @@ window.WAction = (function () {
     var dx = e.x - sx, dy = e.y - sy;
     var d = Math.sqrt(dx * dx + dy * dy) || 1;
     e.kx = dx / d * 200; e.ky = dy / d * 200; e.kt = 0.16;
+    e.windT = 0;                                  // a landed hit interrupts the strike
     e.flash = 0.14;
     if (window.WParticles) {
       WParticles.emit('floattext', e.x, e.y - 20,
@@ -684,11 +685,14 @@ window.WAction = (function () {
       var dp = WU.dist(e.x, e.y, player.x, player.y);
       if (dp > 640) { enemies.splice(i, 1); continue; }
       if (e.flash > 0) e.flash -= dt;
+      if (e.restT > 0) e.restT -= dt;
       if (e.kt > 0) {                             // the hit's push owns the foe
         e.kt -= dt;
         var bx = e.x + e.kx * dt, by = e.y + e.ky * dt;
         if (enemyWalkable(bx, e.y)) e.x = bx;
         if (enemyWalkable(e.x, by)) e.y = by;
+      } else if (e.windT > 0) {
+        /* planted mid wind-up — the flash telegraphs the strike */
       } else {
         var chase = !player.boat && dp < e.def.aggro;
         var speed, tx, ty;
@@ -712,11 +716,38 @@ window.WAction = (function () {
           if (enemyWalkable(e.x, ny)) e.y = ny;
         }
       }
-      if (!player.boat && dp < e.def.r + 11 && window.WGame && WGame.hurtPlayer) {
-        WGame.hurtPlayer(1, e.x, e.y);
+      /* strike: reach + a 0.32 s wind-up the player can step out of;
+         after it lands (or whiffs) the foe rests a beat. windT always
+         ticks down — boarding a boat mid-charge must not freeze it */
+      var rr = e.def.r + 13;
+      if (e.windT > 0) {
+        e.windT -= dt;
+        if (e.windT <= 0) {
+          if (!player.boat && dp < rr + 9 && window.WGame && WGame.hurtPlayer) {
+            WGame.hurtPlayer(1, e.x, e.y);
+          }
+          e.restT = 0.9;
+        }
+      } else if (e.restT <= 0 && !player.boat && dp < rr) {
+        e.windT = 0.32;
       }
       /* a hostile nearby keeps the staff in hand */
       if (dp < 220) weapon.outT = Math.max(weapon.outT, 1.2);
+    }
+    /* soft separation — foes should bump shoulders, not fuse */
+    for (var a = 0; a < enemies.length; a++) {
+      for (var b2 = a + 1; b2 < enemies.length; b2++) {
+        var ea = enemies[a], eb = enemies[b2];
+        var sx = eb.x - ea.x, sy = eb.y - ea.y;
+        var sd = Math.sqrt(sx * sx + sy * sy);
+        var want = ea.def.r + eb.def.r + 3;
+        if (sd > 0.01 && sd < want) {
+          var push = (want - sd) * 0.5;
+          sx = sx / sd * push; sy = sy / sd * push;
+          if (enemyWalkable(ea.x - sx, ea.y - sy)) { ea.x -= sx; ea.y -= sy; }
+          if (enemyWalkable(eb.x + sx, eb.y + sy)) { eb.x += sx; eb.y += sy; }
+        }
+      }
     }
   }
 
@@ -726,6 +757,7 @@ window.WAction = (function () {
     weapon.cd = SWING_CD;
     weapon.swingT = SWING_DUR;
     weapon.outT = Math.max(weapon.outT, 3);
+    weapon.dir = player.dir;               // locked: turning mid-swing stays honest
     WAudio.sfx('swing');
     var v = DIRV[player.dir] || DIRV.down;
     var base = Math.atan2(v[1], v[0]);
@@ -750,17 +782,17 @@ window.WAction = (function () {
 
   function drawEnemy(ctx, e, cam) {
     var bob = Math.sin(e.seed * 7 + (lastEnv ? lastEnv.hour * 60 : 0)) * 2;
-    var blink = e.flash > 0;
+    var blink = e.flash > 0 || e.windT > 0;   // wound-flash AND strike telegraph
     ctx.save();
     ctx.translate(-Math.round(cam.x), -Math.round(cam.y));
     if (e.kind === 'wisp') {
       var cy = e.y - 14 + bob;
       /* soft violet halo, then the shadow body and its pale eyes */
-      ctx.globalAlpha = 0.4;
-      ctx.fillStyle = 'rgba(130,118,235,0.55)';
+      ctx.globalAlpha = blink ? 0.8 : 0.5;
+      ctx.fillStyle = 'rgba(140,128,240,0.6)';
       ctx.beginPath(); ctx.arc(e.x, cy, 13, 0, WU.TAU); ctx.fill();
       ctx.globalAlpha = 1;
-      ctx.fillStyle = blink ? '#f2ecff' : '#2c2749';
+      ctx.fillStyle = blink ? '#f2ecff' : '#352e5e';
       ctx.beginPath(); ctx.arc(e.x, cy, 7.5, 0, WU.TAU); ctx.fill();
       ctx.fillStyle = blink ? '#4a3f7a' : '#cfe8ff';
       ctx.fillRect(e.x - 3.4, cy - 1.5, 2, 2);
@@ -799,7 +831,10 @@ window.WAction = (function () {
      sweeping a 170° arc during swingT — drawn over the body */
   function drawWeapon(ctx, player) {
     if (weapon.outT <= 0) return;
-    var v = DIRV[player.dir] || DIRV.down;
+    /* while the arc is live it honours the locked swing direction;
+       at rest it simply follows wherever the player looks now */
+    var d = weapon.swingT > 0 ? weapon.dir : player.dir;
+    var v = DIRV[d] || DIRV.down;
     var b = Math.atan2(v[1], v[0]);
     var hx = player.x + v[0] * 5 - v[1] * 6;   // the hand: ahead-and-side
     var hy = player.y - 18 + v[1] * 3;

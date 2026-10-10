@@ -468,21 +468,23 @@ window.WHUD = (function () {
       }
     }
 
-    /* tool chips — keycap + label, sized to content */
-    var chips = [['Q', 'Lưới'], ['F', 'Cần'], ['J', 'Gậy'], ['\u25ce', 'Nỏ'], ['Tab', 'Túi']];
-    var chx = vw - 12;
+    /* tool chips — keycap + label, sized to content. Right-to-left from
+       the bottom-right corner; wraps to a row above on narrow windows. */
+    var chips = [['Q', 'Lưới'], ['F', 'Cần'], ['J', 'Gậy'], ['◎', 'Nỏ'], ['Tab', 'Túi']];
+    var chx = vw - 12, chy = vh - 46;
     ctx.textAlign = 'left';
     for (i = chips.length - 1; i >= 0; i--) {
       var c = chips[i];
       var capW = WU.keycapW(18, c[0]);
       ctx.font = font(12, true);
       var w = Math.round(7 + capW + 8 + ctx.measureText(c[1]).width + 10);
+      if (chx - w - 8 < 12 && chx < vw - 12) { chx = vw - 12; chy -= 36; }
       chx -= w + 8;
-      panel(ctx, chx, vh - 46, w, 28, { radius: 14, alpha: 0.85 });
-      WU.keycap(ctx, chx + 7, vh - 41, 18, c[0]);
+      panel(ctx, chx, chy, w, 28, { radius: 14, alpha: 0.85 });
+      WU.keycap(ctx, chx + 7, chy + 5, 18, c[0]);
       ctx.fillStyle = cream(0.9);
       ctx.font = font(12, true);
-      ctx.fillText(c[1], chx + 7 + capW + 8, vh - 27);
+      ctx.fillText(c[1], chx + 7 + capW + 8, chy + 19);
     }
 
     /* toasts (soft entrance: 180 ms fade + slide, soft exit over the tail) */
@@ -594,14 +596,25 @@ window.WHUD = (function () {
         i === sel, items[i].dim, items[i].id);
     }
 
-    /* controls hint in a quiet pill */
+    /* controls hint in a quiet pill — wraps to two lines on narrow windows */
     var hint = 'WASD di chuyển \u00b7 E tương tác \u00b7 Q lưới \u00b7 F câu \u00b7 J gậy \u00b7 click nỏ \u00b7 Tab túi \u00b7 Esc tạm dừng';
     ctx.font = font(12);
     var hw = ctx.measureText(hint).width + 36;
-    panel(ctx, vw / 2 - hw / 2, vh - 40, hw, 26, { radius: 13, alpha: 0.7 });
-    ctx.fillStyle = cream(0.72);
-    ctx.textAlign = 'center';
-    ctx.fillText(hint, vw / 2, vh - 23);
+    if (hw <= vw - 24) {
+      panel(ctx, vw / 2 - hw / 2, vh - 40, hw, 26, { radius: 13, alpha: 0.7 });
+      ctx.fillStyle = cream(0.72);
+      ctx.textAlign = 'center';
+      ctx.fillText(hint, vw / 2, vh - 23);
+    } else {
+      var l1 = 'WASD di chuyển \u00b7 E tương tác \u00b7 Q lưới \u00b7 F câu';
+      var l2 = 'J gậy \u00b7 click nỏ \u00b7 Tab túi \u00b7 Esc tạm dừng';
+      hw = Math.max(ctx.measureText(l1).width, ctx.measureText(l2).width) + 36;
+      panel(ctx, vw / 2 - hw / 2, vh - 58, hw, 44, { radius: 13, alpha: 0.7 });
+      ctx.fillStyle = cream(0.72);
+      ctx.textAlign = 'center';
+      ctx.fillText(l1, vw / 2, vh - 40);
+      ctx.fillText(l2, vw / 2, vh - 22);
+    }
   }
 
   /* ---- Pause ---- */
