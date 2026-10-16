@@ -16,8 +16,9 @@
 #   double-click willowmere/index.html
 
 # Cách 2 — qua server tĩnh (khuyên dùng, để chơi được cả máy arcade):
-cd willowmere && python -m http.server 8940
-# rồi mở http://127.0.0.1:8940/index.html
+#   chạy ở THƯ MỤC GỐC repo (arcade nạp ../neon-swarm/ bên ngoài willowmere/)
+python -m http.server 8940
+# rồi mở http://127.0.0.1:8940/willowmere/index.html
 ```
 
 Lưu ý: game chạy hoàn toàn từ `file://` — không build, không npm, không mạng.
@@ -109,6 +110,6 @@ arcade Esc relay chặn message giả — console sạch 0 errors.
 
 ## Giấy phép & credit
 
-Code của repo này là của tác giả repo. Art/nhạc trong `willowmere/assets/` là
+Code phát hành theo [MIT](LICENSE). Art/nhạc trong `willowmere/assets/` là
 tài nguyên **CC0** — bảng credit chi tiết từng file trong
 [`willowmere/README.md`](willowmere/README.md).

@@ -30,13 +30,7 @@ window.WHUD = (function () {
   var qSnap = null;
   var lastWeather = null;
 
-  var VISTA_NAMES = {
-    willow_overlook: 'Đồi Liễu',
-    heron_rock: 'Đá Diệc',
-    lighthouse_head: 'Mũi Hải Đăng',
-    shepherds_tor: 'Đỉnh Chăn Cừu',
-    old_stone_circle: 'Vòng Đá Cổ'
-  };
+  /* vista names live on the vista record (world.js VISTA_DEFS) — one source */
 
   /* ui.png atlas rows (160×112 sheet): hearts/tools/weather row 4,
      item icons row 5. Critter/fish cells hold unrelated sprites (chickens,
@@ -1019,7 +1013,7 @@ window.WHUD = (function () {
       ctx.textAlign = 'center';
       ctx.font = font(13, true);
       ctx.fillStyle = '#ffd98a';
-      var name = VISTA_NAMES[vista.id] || 'Willowmere';
+      var name = vista.name || 'Willowmere';
       ctx.fillText(name.toUpperCase().split('').join('\u2009'), vw / 2, vh * 0.72);
       ctx.font = 'italic 17px "Times New Roman",serif';
       ctx.fillStyle = '#f2ead8';
