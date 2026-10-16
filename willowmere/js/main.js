@@ -1020,6 +1020,16 @@ window.WGame = (function () {
             opts.shake = !opts.shake;
             WU.save(OPTS_KEY, opts);
             WAudio.sfx(opts.shake ? 'chime' : 'pop');
+          } else if (bs[i].id === 'music' || bs[i].id === 'sfx') {
+            /* click directly on the pip bar sets that notch — the label
+               area only selects the row (hover already handled that) */
+            var px0 = canvas.width / dpr / 2 - 190 + 130;
+            if (WInput.mouse.x >= px0 && WInput.mouse.x <= px0 + 170) {
+              var v2 = Math.round(WU.clamp((WInput.mouse.x - px0) / 170, 0, 1) * 10) / 10;
+              if (bs[i].id === 'music') WAudio.setMusicVolume(v2);
+              else WAudio.setSfxVolume(v2);
+              WAudio.sfx('click');
+            }
           }
         }
       }
