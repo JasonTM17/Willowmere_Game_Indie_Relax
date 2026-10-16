@@ -641,10 +641,26 @@ window.WHUD = (function () {
 
     /* hearts — player hp rides the top-left corner */
     var pl = env && env.player;
+    var S0 = window.WStory;
+    var emb = (S0 && S0.embers && !S0.lampLit) ? S0.embers() : -1;
     if (pl && typeof pl.hp === 'number') {
       var maxH = pl.maxHp || 3;
-      panel(ctx, 12, 12, 22 + maxH * 18, 26, { radius: 13, alpha: 0.85 });
+      var hpW = 22 + maxH * 18 + (emb >= 0 ? 46 : 0);   // + lantern while the arc runs
+      panel(ctx, 12, 12, hpW, 26, { radius: 13, alpha: 0.85 });
       for (var hi = 0; hi < maxH; hi++) heart(ctx, 22 + hi * 18, 17, 16, hi < pl.hp);
+      if (emb >= 0) {
+        /* the warden's lantern: four ember pips that fill as questlines
+           close — the arc's fuel at a glance, gone once the lamp burns */
+        var lx = 22 + maxH * 18 + 4;
+        ctx.fillStyle = 'rgba(90,70,40,0.9)';
+        ctx.fillRect(lx + 3, 20, 8, 9);                 // lamp cage
+        ctx.fillRect(lx + 5, 17, 4, 2);                 // cap
+        ctx.fillStyle = '#ffc46a';
+        ctx.fillRect(lx + 5, 23, 4, 4);                 // flame
+        ctx.font = font(10, true);
+        ctx.fillStyle = cream(0.85);
+        ctx.fillText(emb + '/4', lx + 16, 28);
+      }
     }
 
     /* rain forecast chip: rain is rolled at 06:00 for the whole day */

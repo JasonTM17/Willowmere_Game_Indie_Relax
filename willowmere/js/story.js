@@ -255,6 +255,13 @@ window.WStory = (function () {
     if (!flag('got_' + itemKey)) {
       setFlag('got_' + itemKey, true);
       if (FIRST[itemKey] && window.WHUD) WHUD.toast(FIRST[itemKey]);
+      /* a first catch is a journal line (B): say so once per species —
+         the 'Nhận được' toast already named the item, this names the book */
+      var it = window.WAction && WAction.ITEMS ? WAction.ITEMS[itemKey] : null;
+      if (it && (it.kind === 'critter' || it.kind === 'fish') &&
+          !FIRST[itemKey] && window.WHUD) {
+        WHUD.toast('Sổ tay: mục mới \u2014 ' + it.name + '.');
+      }
     }
   }
 
