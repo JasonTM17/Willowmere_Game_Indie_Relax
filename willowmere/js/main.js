@@ -398,6 +398,7 @@ window.WGame = (function () {
     sleepFx.t = 0;
     state = 'PLAY';
     env.frozen = true;
+    if (WAction.cancelFish) WAction.cancelFish();   // no bobber waits out the night
     WAudio.sfx('sleep');
   }
 

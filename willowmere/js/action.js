@@ -149,7 +149,7 @@ window.WAction = (function () {
   var inventory = {};     // { itemKey: count }, ≤ MAX_KINDS distinct
   var critters = [];      // {id, def, x, y, wx, wy, wt, seed} — alive cap 40
   var motes = [];         // {x, y, seed} — alive cap 12
-  var projs = [];         // slingshot pebbles in flight — cap 8
+  var projs = [];         // slingshot pebbles in flight — 1 at a time (§5.3)
   var swingT = 0;         // net-swing arc timer (Q) — not the staff
   var swingDir = 'down';  // facing locked at the Q press, for the arc draw
   var spawnT = 1, moteT = 2;
