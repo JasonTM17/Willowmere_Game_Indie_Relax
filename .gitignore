@@ -1,0 +1,23 @@
+# Workspace runtime / tooling state
+.zcode/
+.mimosa/
+.video_agent/
+.zcodeignore
+.playwright-mcp/
+
+# Raw capture staging area (not shipped; finals live in docs/media/)
+media_raw/
+
+# Junk file created by redirecting "> nul" from a POSIX shell
+nul
+
+# Dependencies
+node_modules/
+
+# Secrets
+.env
+
+# Logs and OS metadata
+*.log
+.DS_Store
+Thumbs.db
