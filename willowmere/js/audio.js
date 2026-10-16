@@ -107,6 +107,13 @@
     if (cur) { cur.target = 0; cur.dying = true; }
     var slot = { el: el, vol: 0, target: musicVol, dying: false };
     slot.isDead = function () { return dead; };
+    /* one element, one slot: a re-request of a still-dying track must drop
+       the stale slot WITHOUT pausing — el was play()ed just above and is the
+       live one; the stale slot only has to stop existing so its bottom-out
+       pause never fires and it quits fighting el.volume */
+    for (var f = fades.length - 1; f >= 0; f--) {
+      if (fades[f].el === el) fades.splice(f, 1);
+    }
     fades.push(slot);
     cur = slot;
     return true;

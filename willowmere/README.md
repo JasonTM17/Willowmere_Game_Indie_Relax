@@ -167,8 +167,8 @@ trường nếu có lễ hội, bông moonbell phát sáng dưới chân tháp�
 - **Chiếc tủ cũ cạnh nhà bạn** (bên phải cửa cottage) là một máy arcade kỳ lạ:
   nhấn `E` để chơi **Neon Swarm** — mini-game bắn súng neon do chính làng cất
   giữ. Làng đứng yên chờ bạn; thắng được trận DAWN bên trong thì cái tủ cũng
-  ấm hơn một chút. (Cần mở qua HTTP server hoặc `file://` — bấm `✕ LEAVE` để
-  về làng.)
+  ấm hơn một chút. (Cần mở qua HTTP server hoặc `file://` — nhấn `Esc` ở màn
+  hình title của Neon Swarm, hoặc bấm `✕ LEAVE`, để về làng.)
 
 ## Credits — tài nguyên (toàn bộ CC0 / Public Domain)
 

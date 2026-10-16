@@ -184,23 +184,26 @@ also renders full-length in a small "overheard" panel above the pair.
 | `am_forecast` | Finn + Hana | dock · 19–20 | — | deadpan weather forecast |
 | `am_colors` | Junie + Rosa | green · 14–15 | flag `met_junie` | the garden as a palette |
 | `am_seeds` | Gideon + Rosa | green bench · 18–20 | quest `seeds_of_spring` done_a/b | line differs by outcome |
-| `am_lamp` | Finn + Marlow | lighthouse base · 18–21 | flag `marlow_confession` | grandson & grandfather, quietly |
+| `am_lamp` | Finn + Marlow | lighthouse base · 18–24 | flag `marlow_confession` | grandson & grandfather, quietly |
 
 **Engine schedule notes (implementation, §3.1/§3.3).** The engine walks NPCs
 at real-time 42 px/s, so crossing the map takes ~2–3 game-hours — longer than
 some §3.1 beats. Consequences, all deliberate:
 
 - Commutes are packed into the small hours so a beat is actually *stood at*:
-  Marlow walks to the tide pools 2–5 (beat 5–8 intact) and stays at the
-  lighthouse base to 21:30 so Finn's evening visit (pair `am_lamp`) overlaps;
-  Finn is home from 21:00 rather than 20:00. Junie reaches the Tor ~20:2 and
-  paints the last light; her forest light-shaft beat (15–18) had to give, as
-  the Tor is a full map from the north forest.
+  Marlow walks to the tide pools 2–5, leaves them at 7:00 so the §3.1 8–11
+  hut beat is really stood (~10:30 after the ~3.5 h walk), and stays at the
+  lighthouse base to 22:45 so Finn's evening visit (pair `am_lamp`) overlaps;
+  Finn waits at the tower 19:30–22:30 (the green-games walk alone eats
+  ~1.8 h) and is home from 22:30 rather than 20:00. Junie reaches the Tor
+  ~20:2 and paints the last light; her forest light-shaft beat (15–18) had
+  to give, as the Tor is a full map from the north forest.
 - Pair windows are re-pinned to where the restored beats actually overlap:
   `am_post` 8.4–9 (mail round ends at the bakery), `am_colors` 16.9–17.6
   (Rosa's bench ends 16.5 so the pair can meet); `am_lamp` keeps the wide
-  `18–24` window — both villagers stand at the base only ~19.5–21.3 anyway
-  (Marlow 18–21.5, Finn 19.5–21), and the `marlow_confession` flag gates it.
+  `18–24` window — the two stand at the base together ~21.4–22.5
+  (Marlow 18–22.75, Finn 19.5–22.5), and the `marlow_confession` flag gates
+  it.
 - `am_tide` (Marlow + Bramble) has no shared geography under faithful §3.1 —
   his mornings are at the beach tide pools, Bramble's on the pasture — so it
   is kept as data but does not fire; `am_forecast` lost its dock overlap to

@@ -10,6 +10,10 @@
    in the full-screen epilogue. We therefore scan only N(...) texts in
    story.js and `text:` fields in dialogue.js.
 
+   Speech bubbles (the PAIRS tables in npcs.js) are capped at 60 chars by
+   DESIGN.md §3.3/§12 — drawBubble wraps to 3 lines and drops the overflow
+   without an ellipsis — so those literals are scanned with their own cap.
+
    Clean output: "DIALOGUE CAP OK", exit 0.
    Run from the workspace root:  node willowmere/tools/check_dialogue.js
 */
@@ -20,6 +24,7 @@ const path = require('path');
 
 const JS_DIR = path.join(__dirname, '..', 'js');
 const CAP = 120;
+const BUBBLE_CAP = 60;
 
 /* Decode JS single-quoted escapes enough to measure real glyph count. */
 function unescapeLen(s) {
@@ -27,7 +32,8 @@ function unescapeLen(s) {
           .replace(/\\(.)/g, '$1').length;
 }
 
-function scan(file, re, label) {
+function scan(file, re, label, cap) {
+  cap = cap || CAP;
   const src = fs.readFileSync(file, 'utf8');
   const lines = src.split('\n');
   const violations = [];
@@ -36,9 +42,9 @@ function scan(file, re, label) {
     const r = new RegExp(re.source, 'g');
     while ((m = r.exec(line))) {
       const len = unescapeLen(m[1]);
-      if (len > CAP) {
+      if (len > cap) {
         violations.push(path.basename(file) + ':' + (i + 1) +
-          ' ' + label + ' text is ' + len + ' chars (cap ' + CAP + '): "' +
+          ' ' + label + ' text is ' + len + ' chars (cap ' + cap + '): "' +
           m[1].slice(0, 50) + '…"');
       }
     }
@@ -61,6 +67,15 @@ function main() {
     path.join(JS_DIR, 'dialogue.js'),
     /\btext:\s*'((?:[^'\\]|\\.)*)'/,
     'registry'
+  ));
+
+  /* npcs.js PAIRS: { sp: '…', text: '…' } literals are speech bubbles
+     (§3.3/§12 cap 60 — wrapText drops overflow past 3 lines, no ellipsis) */
+  violations.push(...scan(
+    path.join(JS_DIR, 'npcs.js'),
+    /\btext:\s*'((?:[^'\\]|\\.)*)'/,
+    'bubble',
+    BUBBLE_CAP
   ));
 
   if (violations.length) {

@@ -67,11 +67,14 @@ window.WHUD = (function () {
 
   /* ---- Tab opens the pouch, B opens the journal (HUD-internal toggles) -- */
   function onKey(e) {
+    /* Tab's default (focus cycling) is blocked on repeats too: the page has
+       no focusable element, so one unblocked repeat would push focus into
+       the browser chrome. The toggle itself stays edge-triggered below. */
+    if (e.code === 'Tab') e.preventDefault();
     if (e.repeat) return;            // held keys must not strobe the overlay
     var g = window.WGame;
     var playing = g && typeof g.state === 'function' && g.state() === 'PLAY';
     if (e.code === 'Tab') {
-      e.preventDefault();
       if (playing) { bagOpen = !bagOpen; if (bagOpen) journalOpen = false; WAudio.sfx('click'); }
       else { bagOpen = false; journalOpen = false; }
     } else if (e.code === 'KeyB') {
@@ -594,6 +597,10 @@ window.WHUD = (function () {
 
   /* ---- in-world HUD ---- */
   function draw(ctx, env, state) {
+    /* the buttons array mirrors what the frame just drew: a frame without a
+       menu (PLAY/DIALOGUE/VISTA) leaves it empty, so the first PAUSE frame
+       after autoPause has no phantom rects to hover or click */
+    buttons.length = 0;
     var vw = ctx.canvas.width / uiDpr();
     var vh = ctx.canvas.height / uiDpr();
     var h = env && env.hour !== undefined ? WU.hnorm(env.hour) : 12;

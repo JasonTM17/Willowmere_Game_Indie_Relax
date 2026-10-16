@@ -698,6 +698,13 @@
 
     switch (game.state) {
       case ST.TITLE: {
+        // Willowmere cabinet relay: Esc at this title screen asks the parent
+        // page to leave the arcade. A keydown inside the iframe never reaches
+        // the parent window, so the cabinet is exited via postMessage;
+        // Escape while playing still just pauses (stepPlaying handles it).
+        if (GI.justPressed('Escape')) {
+          try { window.parent.postMessage('wm-arcade-esc', '*'); } catch (e) {}
+        }
         game.titleT += dt;
         cam.x = Math.sin(game.titleT * 0.06) * 480;    // slow drift over the grid
         cam.y = game.titleT * 16;
