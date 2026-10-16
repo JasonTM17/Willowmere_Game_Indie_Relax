@@ -989,7 +989,7 @@ window.WHUD = (function () {
       } else {
         ctx.font = font(13);
         ctx.fillStyle = rows[i].on ? 'rgba(242,234,216,0.7)' : 'rgba(220,190,180,0.85)';
-        ctx.fillText(rows[i].on ? 'bật' : 'tắt', x + 130, ry);
+        ctx.fillText(rows[i].on ? 'bật' : 'tắt', x + 150, ry);   // past the longest label ("Rung màn hình")
       }
       if (sel === i) {
         ctx.fillStyle = '#ffd98a';
