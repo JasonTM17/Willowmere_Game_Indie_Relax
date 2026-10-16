@@ -88,10 +88,14 @@
     }
     var n = Math.min(rainTarget - live, 8);
     for (var k = 0; k < n; k++) {
+      var vy = 470 + Math.random() * 90;
+      var y = view.y + Math.random() * view.h * 0.7;
       emit('rain',
-        view.x + Math.random() * view.w,
-        view.y + Math.random() * view.h * 0.7,
-        { vx: -18 - Math.random() * 14, vy: 470 + Math.random() * 90, life: 1.5 });
+        view.x + Math.random() * view.w, y,
+        { vx: -18 - Math.random() * 14, vy: vy,
+          /* live exactly until the bottom of the view — a fixed life would
+             evaporate high spawns mid-screen on tall viewports */
+          life: (view.y + view.h + 8 - y) / vy });
     }
   }
 
@@ -105,7 +109,12 @@
         case T.RAIN:
           p.x += p.vx * dt;
           p.y += p.vy * dt;
-          if (p.y > view.y + view.h + 8) p.life = 0;
+          /* the fall ends at the bottom of the view or on a water surface
+             (the expiry branch then turns a water hit into a ripple) */
+          if (p.y > view.y + view.h + 8 ||
+              (world && typeof world.waterAt === 'function' && world.waterAt(p.x, p.y))) {
+            p.life = 0;
+          }
           break;
         case T.RIPPLE:
           break;

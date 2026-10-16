@@ -276,7 +276,8 @@ window.WWorld = (function () {
       window.WGame.sleep();
       return;
     }
-    if (!night) toast('Trời còn sáng lắm \u2014 quay lại sau 18:00 nhé.');
+    if (!night && h < 7) toast('Trời còn tối \u2014 đợi mặt trời lên đã.');   // darkness clears at 07:00
+    else if (!night) toast('Trời còn sáng lắm \u2014 quay lại sau 18:00 nhé.');
     else toast('Chiếc giường đã trải sẵn, chờ bạn.');
     blip('click');
   }
@@ -500,7 +501,7 @@ window.WWorld = (function () {
     markBlockedRect(32, 48, 4, 4);
     setPoi('green_well', 34, 51);
 
-    var board = addTL('notice_board', 36, 48, 2, 1, 'props', true);
+    var board = addTL('notice_board', 36, 48, 2, 2, 'props', true);  // cell is 2x2
     board.kind = 'notice_board';
     markBlockedRect(35, 47, 4, 3);
     setPoi('notice_board', 37, 49);
@@ -1375,8 +1376,8 @@ window.WWorld = (function () {
       for (var tx = tx0; tx <= tx1; tx++) {
         var i = idx(tx, ty);
         var x = tx * TILE - ox, y = ty * TILE - oy;
+        if (pier[i]) { drawPierTile(g, x, y, atlas); continue; }   // pier is static
         if (water[i]) continue;                 // water stays a live layer
-        if (pier[i]) { drawPierTile(g, x, y, atlas); continue; }
         drawGroundTile(g, tx, ty, x, y, atlas, tvar[i]);
         if (path[i]) drawPathOverlay(g, x, y, atlas);
         else if (trail[i]) drawTrailOverlay(g, x, y, atlas);
@@ -1414,7 +1415,7 @@ window.WWorld = (function () {
         for (var wy = ty0; wy <= ty1; wy++) {
           for (var wx = tx0; wx <= tx1; wx++) {
             var wi = idx(wx, wy);
-            if (water[wi]) {
+            if (water[wi] && !pier[wi]) {   // pier planks already sit in the cache
               drawWaterTile(ctx, wx, wy, wx * TILE, wy * TILE, atlas,
                 biome[wi] === B_SEA, tvar[wi]);
             }

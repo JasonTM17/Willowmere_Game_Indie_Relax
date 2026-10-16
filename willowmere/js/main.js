@@ -92,20 +92,34 @@ window.WGame = (function () {
       if (h >= 18 || h < 5) {
         WDialogue.start('sleep_offer');
         if (WDialogue.active()) state = 'DIALOGUE';
+      } else if (h < 7) {
+        WHUD.toast('Trời còn tối \u2014 đợi mặt trời lên đã.');   // darkness clears at 07:00
+        WAudio.sfx('click');
       } else {
         WHUD.toast('Trời còn sáng lắm \u2014 quay lại sau 18:00 nhé.');
         WAudio.sfx('click');
       }
     };
 
-    /* the old cabinet (Neon Swarm overlay): close button + Esc fallback for
-       when the bezel, not the iframe, holds focus */
+    /* the old cabinet (Neon Swarm overlay): the ✕ close button, plus two Esc
+       paths — the keydown below only fires while the parent page (bezel)
+       holds focus; while the iframe holds focus, Neon Swarm relays Esc from
+       its own title screen as a 'wm-arcade-esc' message (a keydown inside
+       the iframe never reaches this window). Only the cabinet's own frame
+       is trusted as the message source. */
     arcadeOverlay = document.getElementById('arcade-overlay');
     var closeBtn = document.getElementById('arcade-close');
     if (closeBtn) closeBtn.addEventListener('click', closeArcade);
     window.addEventListener('keydown', function (e) {
       if (state === 'ARCADE' && e.code === 'Escape') {
         WInput.consume('pause');      // the same Esc must not reopen pause a frame later
+        closeArcade();
+      }
+    });
+    window.addEventListener('message', function (e) {
+      var frame = document.getElementById('arcade-frame');
+      if (state === 'ARCADE' && e.data === 'wm-arcade-esc' &&
+          frame && e.source === frame.contentWindow) {
         closeArcade();
       }
     });
@@ -160,6 +174,10 @@ window.WGame = (function () {
     } catch (e) { won = false; }
     if (frame) frame.src = 'about:blank';      // kills the loop + audio
     if (arcadeOverlay) arcadeOverlay.hidden = true;
+    /* the relay close happens with the iframe still holding focus (no
+       parent-page click moved it) — hand the keyboard back or every key
+       after leaving the cabinet dies with it */
+    try { window.focus(); } catch (e) {}
     env.frozen = false;
     curMusic = '';                              // re-trigger musicKey next update
     state = 'PLAY';
@@ -186,6 +204,7 @@ window.WGame = (function () {
     player.invuln = 0;
     player.kt = 0;
     faintFx.active = false;
+    sleepFx.active = false;     // a quit out of a sleep fade must not veil the title
     hurtFx = 0;
     zoomTgt = 0.8;
     WParticles.clear();
@@ -236,12 +255,28 @@ window.WGame = (function () {
     env.day = (typeof d.day === 'number' && d.day >= 1) ? d.day : 1;
     env.hour = (typeof d.hour === 'number') ? WU.hnorm(d.hour) : 6.5;
     env.weather = (d.weather === 'rain') ? 'rain' : 'clear';
+    /* the weather stamp rides new saves; older files derive it — past 06:00
+       the day was already rolled, before 06:00 the stamp still belongs to
+       the previous day (undefined lets the 06:00 roll run) */
+    if (typeof d.weatherDay === 'number') env.weatherDay = d.weatherDay;
+    else env.weatherDay = (WU.hnorm(env.hour) >= 6) ? env.day : undefined;
     if (d.player && typeof d.player.x === 'number') {
-      player.x = d.player.x;
-      player.y = d.player.y;
-      player.dir = d.player.dir || 'down';
-      if (typeof d.player.hp === 'number') {
-        player.hp = WU.clamp(Math.floor(d.player.hp), 1, player.maxHp);
+      if (typeof d.player.hp === 'number' && d.player.hp <= 0) {
+        /* hp 0 can only exist in a save taken mid-faint (autoPause during
+           the fade): skip straight to the wake-up updateFaint was heading
+           for — doorstep, whole again (main.js updateFaint phase 1) */
+        player.x = 944;
+        player.y = 1872;
+        player.dir = 'down';
+        player.hp = player.maxHp;
+        player.invuln = 2.5;
+      } else {
+        player.x = d.player.x;
+        player.y = d.player.y;
+        player.dir = d.player.dir || 'down';
+        if (typeof d.player.hp === 'number') {
+          player.hp = WU.clamp(Math.floor(d.player.hp), 1, player.maxHp);
+        }
       }
     }
     /* boats: hulls keep where they were moored; being aboard round-trips too */
@@ -333,6 +368,7 @@ window.WGame = (function () {
       day: env.day,
       hour: env.hour,
       weather: env.weather,
+      weatherDay: env.weatherDay,   // the 06:00 weather stamp (§2) rides the save
       player: { x: Math.round(player.x), y: Math.round(player.y), dir: player.dir, hp: player.hp },
       flags: WStory.flags,
       quests: quests,
@@ -365,14 +401,28 @@ window.WGame = (function () {
     WAudio.sfx('sleep');
   }
 
+  /* midnight roll-over shared by play and vista so the day counter (and its
+     "Ngày N." toast) behaves the same in both states */
+  function rollMidnight() {
+    if (env.hour >= 24) {
+      env.hour -= 24;
+      env.day += 1;
+      WHUD.toast('Ngày ' + env.day + '.');
+    }
+  }
+
   function updateSleep(dt) {
     sleepFx.t += dt;
     if (sleepFx.phase === 0 && sleepFx.t >= 1) {
       sleepFx.phase = 1;
       sleepFx.t = 0;
-      env.day += 1;
+      /* only the evening side (18:00-24:00) owes a new day number: a night
+         owl already paid it at the midnight roll-over, so a 00:00-05:59
+         sleep wakes into 06:30 of the same day (no day-fragment) */
+      if (env.hour >= 6) env.day += 1;
       env.hour = 6.5;
       env.weather = WWorld.weatherRoll(env.day);
+      env.weatherDay = env.day;    // the 06:30 wake counts as the 06:00 roll
       player.hp = player.maxHp;      // sleep knits everything back together
       player.invuln = 0;
       WParticles.clear();
@@ -642,8 +692,10 @@ window.WGame = (function () {
       WAudio.sfx('chime');
       return;
     }
-    WWorld.markVistaSeen(v.id);
+    /* onReach first: it toasts the colors tally on a fresh vista, and
+       markVistaSeen sets the very same flag — the old order killed the toast */
     if (WStory && typeof WStory.onReach === 'function') WStory.onReach(v.id);
+    WWorld.markVistaSeen(v.id);
     vista = { v: v, t: 0, first: true };
     state = 'VISTA';
     zoomTgt = 0.45;
@@ -655,8 +707,11 @@ window.WGame = (function () {
     vista.t += dt;
     if (vista.t > 0.7) {
       var ax = WInput.axis();
+      /* Esc/P skips the panorama like E/J — endFrame() clears the edge, so
+         the same press cannot reopen PAUSE a frame later */
       var leave = !!(ax.x || ax.y) || WInput.down('net') || WInput.down('fish') ||
-                  WInput.pressed('interact') || WInput.pressed('attack');
+                  WInput.pressed('interact') || WInput.pressed('attack') ||
+                  WInput.pressed('pause');
       if (leave || vista.t > 3.5) {   // ~3 s of panorama, then back to play
         var v = vista;
         vista = null;
@@ -698,6 +753,9 @@ window.WGame = (function () {
     WWorld.env = env;
     syncEnv();
     pulseT += dt;
+    /* the morning card fades in every state — a pause or quit-to-title
+       must not freeze it on screen */
+    if (dayCard.t > 0) dayCard.t -= dt;
 
     switch (state) {
       case 'TITLE': updateTitle(dt); break;
@@ -782,12 +840,7 @@ window.WGame = (function () {
       env.frozen = false;
       updatePlayer(dt);
       env.hour += dt / 20;                     // 1 hour = 20 s
-      if (env.hour >= 24) {
-        env.hour -= 24;
-        env.day += 1;
-        env.weather = WWorld.weatherRoll(env.day);
-        WHUD.toast('Ngày ' + env.day + '.');
-      }
+      rollMidnight();
       /* hearts mend slowly on their own; a full sleep restores them all */
       if (player.hp < player.maxHp) {
         regenT -= dt;
@@ -796,8 +849,14 @@ window.WGame = (function () {
     }
     if (hurtFx > 0) hurtFx -= dt;
     if (shakeT > 0) shakeT -= dt;
-    if (dayCard.t > 0) dayCard.t -= dt;
     clearExpiredRain();
+    /* §2: each day's weather rolls once at 06:00 — a midnight roll would
+       rain 00:00-06:00, and nights stay clear. weatherDay stamps the day
+       already rolled (the roll is deterministic per day, no save needed). */
+    if (WU.hnorm(env.hour) >= 6 && env.weatherDay !== env.day) {
+      env.weatherDay = env.day;
+      env.weather = WWorld.weatherRoll(env.day);
+    }
     syncEnv();
 
     WStory.update(env);
@@ -872,7 +931,7 @@ window.WGame = (function () {
   function updateVistaState(dt) {
     env.frozen = true;
     env.hour += dt / 20;
-    if (env.hour >= 24) { env.hour -= 24; env.day += 1; env.weather = WWorld.weatherRoll(env.day); }
+    rollMidnight();
     clearExpiredRain();
     syncEnv();
     WStory.update(env);
@@ -987,6 +1046,8 @@ window.WGame = (function () {
     if (Math.abs(zoomTgt - zoom) < 0.002) zoom = zoomTgt;
     var vs = viewWH();
     var vw = vs.w / zoom, vh = vs.h / zoom;
+    /* world-space view half size feeds the enemy spawn ring (action.js) */
+    if (WAction.setViewHalf) WAction.setViewHalf(vw / 2, vh / 2);
     var cx, cy;
     if (state === 'TITLE') {
       cx = 1088 + Math.sin(performance.now() * 0.00008) * 40;
@@ -1056,14 +1117,19 @@ window.WGame = (function () {
 
     WAction.drawOver(ctx, cam, player);
     WWorld.drawOver(ctx, cam, env);
-    if (WStory.flag('festival')) drawBunting(ctx);
+    if (WStory.flag('festival')) drawBunting(ctx, cam);
     WParticles.draw(ctx, cam);
     WWorld.drawLights(ctx, cam, env);
     WWorld.applyTint(ctx, env);
   }
 
   function drawPlayerBody() {
+    /* hull and cloak draw at raw world coords (drawChar applies its own
+       camera translate), so each gets the module-standard save/translate */
+    ctx.save();
+    ctx.translate(-Math.round(cam.x), -Math.round(cam.y));
     if (player.boat) WWorld.drawBoatHull(ctx, player.x, player.y);
+    ctx.restore();
     var frame = player.moving ? 1 + (((player.walkT * 5.5) | 0) % 2) : 0;
     /* invulnerability blink: after a hit the body flickers instead of
        pretending nothing happened */
@@ -1073,14 +1139,20 @@ window.WGame = (function () {
     ctx.globalAlpha = 1;
     /* wool cloak: white scarf in the rain (cosmetic, §3.2 lost_lamb B) */
     if (WAction.count('wool_cloak') > 0 && env.weather === 'rain') {
+      ctx.save();
+      ctx.translate(-Math.round(cam.x), -Math.round(cam.y));
       ctx.fillStyle = 'rgba(245,242,235,0.95)';
       ctx.fillRect(player.x - 6, player.y - 34, 12, 4);
       ctx.fillRect(player.x - 8, player.y - 31, 4, 9);
+      ctx.restore();
     }
   }
 
-  function drawBunting(ctx) {
-    /* festival bunting strung between the four lamp posts on the green */
+  function drawBunting(ctx, cam) {
+    /* festival bunting strung between the four lamp posts on the green;
+       drawn in world space, so it needs the module-standard translate */
+    ctx.save();
+    ctx.translate(-Math.round(cam.x), -Math.round(cam.y));
     var posts = [[30, 47], [38, 47], [30, 53], [38, 53]];
     var colors = ['#e2574c', '#f2b6c6', '#7ec8e0', '#f7e08c', '#8fb05a'];
     var now = performance.now() * 0.001;
@@ -1109,6 +1181,7 @@ window.WGame = (function () {
         ctx.fill();
       }
     }
+    ctx.restore();
   }
 
   function draw() {
