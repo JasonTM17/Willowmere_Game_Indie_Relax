@@ -243,6 +243,10 @@ window.WGame = (function () {
     enterFx = 0.9;           // lift the veil into the intro scene
     WDialogue.start('intro_1');
     state = WDialogue.active() ? 'DIALOGUE' : 'PLAY';
+    /* "Chơi mới" already asked twice — write the fresh slot NOW, or quitting
+       to title before the first sleep would resurrect the old run under
+       Continue (the confirm warned it would be buried) */
+    saveGame(true);
   }
 
   function continueGame() {
