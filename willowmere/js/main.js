@@ -876,7 +876,7 @@ window.WGame = (function () {
     var m = WInput.mouse;
     if (m.inside) {
       WAction.setAim({ x: cam.x + m.x / zoom, y: cam.y + m.y / zoom });
-      if (m.clicked && !sleepFx.active && !overlaid) {
+      if (m.clicked && !sleepFx.active && !faintFx.active && !overlaid) {
         WAction.trySling(cam.x + m.x / zoom, cam.y + m.y / zoom, player);
       }
     } else {
