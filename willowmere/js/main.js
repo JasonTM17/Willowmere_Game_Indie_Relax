@@ -49,6 +49,7 @@ window.WGame = (function () {
   var vinside = false;       // player was inside a vista radius last PLAY frame
   var epi = { shown: false, t: 0, scroll: 0, lines: [] };
   var sleepFx = { active: false, phase: 0, t: 0 };
+  var enterFx = 0;           // black veil lifting after title -> world
   var faintFx = { active: false, phase: 0, t: 0 };
   var hurtFx = 0;              // red vignette seconds-left after taking a hit
   var shakeT = 0;              // camera shake seconds-left — same trigger
@@ -239,6 +240,7 @@ window.WGame = (function () {
     syncEnv();
     WHUD.clearToasts();
     WHUD.resetWatchers();
+    enterFx = 0.9;           // lift the veil into the intro scene
     WDialogue.start('intro_1');
     state = WDialogue.active() ? 'DIALOGUE' : 'PLAY';
   }
@@ -324,6 +326,7 @@ window.WGame = (function () {
     WHUD.resetWatchers();
     WHUD.clearToasts();
     WHUD.toast('Chào mừng trở lại Willowmere.');
+    enterFx = 0.9;
     state = 'PLAY';
   }
 
@@ -1291,6 +1294,12 @@ window.WGame = (function () {
       ctx.fillRect(0, 0, vw, vh);
     }
 
+    /* title → world: a quick veil lifting, warmer than a hard cut */
+    if (enterFx > 0) {
+      ctx.fillStyle = 'rgba(8,9,14,' + Math.min(1, enterFx / 0.9).toFixed(3) + ')';
+      ctx.fillRect(0, 0, vw, vh);
+    }
+
     WInput.endFrame();
   }
 
@@ -1301,6 +1310,7 @@ window.WGame = (function () {
     last = t;
     if (!isFinite(dt)) dt = 0;   /* a dead timestamp must not NaN the loop dead */
     dt = WU.clamp(dt, 0, 0.05);
+    if (enterFx > 0) enterFx -= dt;
     frameState.dt = dt;
     frameState.zoom = zoom;
 
