@@ -181,7 +181,7 @@ window.WDialogue = (function () {
     if (cur && npcCtx && curId !== 'gift_result' && window.WAction) {
       var hasGift = false;
       for (var j = 0; j < out.length; j++) if (out[j].gift) { hasGift = true; break; }
-      if (!hasGift && WAction.list().length > 0) {
+      if (!hasGift && giftableList().length > 0) {
         out.push({ label: '(Tặng một món quà\u2026)', gift: true, _gift: true });
       }
     }
@@ -243,9 +243,22 @@ window.WDialogue = (function () {
   }
 
   /* ---- gift picker ---- */
+  /* quest-unique keepsakes (ITEMS.noGift) can never be given away — §4
+     promises nothing can be lost */
+  function giftable(key) {
+    return !(window.WAction && WAction.ITEMS[key] && WAction.ITEMS[key].noGift);
+  }
+
+  function giftableList() {
+    var all = WAction.list();
+    var out = [];
+    for (var i = 0; i < all.length; i++) if (giftable(all[i])) out.push(all[i]);
+    return out;
+  }
+
   function openGift() {
     if (!window.WAction || !npcCtx) { close(); return; }
-    giftItems = WAction.list();
+    giftItems = giftableList();
     if (!giftItems.length) {
       lastGift = { speaker: npcCtx.def.name, text: 'Túi bạn trống rồi, Quản lý. Chưa có gì để cho \u2014 chưa thôi.' };
       start('gift_result');
@@ -298,7 +311,14 @@ window.WDialogue = (function () {
     var qn = (S && typeof S.questNodeFor === 'function') ? S.questNodeFor(npc.id) : null;
     if (qn && start(qn)) return true;
     var bonus = (S && typeof S.talkBonusNode === 'function') ? S.talkBonusNode(npc.id) : null;
-    if (bonus && start(bonus)) return true;
+    if (bonus && start(bonus)) {
+      /* the hand-off is announced once, here — talkBonusNode must stay a
+         pure query (the draw loops call it every frame) */
+      if (bonus === 'marlow_staff' && window.WHUD) {
+        WHUD.toast('Marlow đưa cho bạn Gậy Giữ Đèn \u2014 vung xa và nặng hơn.');
+      }
+      return true;
+    }
     var hearts = window.WNpcs ? WNpcs.friend(npc.id) : 0;
     if (hearts >= 6 && npc.def.unlock6 && start(npc.def.unlock6)) return true;
     if (hearts >= 3 && npc.def.unlock3 && start(npc.def.unlock3)) return true;
@@ -319,7 +339,11 @@ window.WDialogue = (function () {
   }
 
   function onCanvasDown(e) {
-    if (!active() || document.hidden) return;
+    /* DIALOGUE-state guard: a pause (autoPause on tab hide) keeps the box
+       alive underneath, but its stale hit-rects and digits must not fire
+       while the box is not on screen */
+    if (!active() || document.hidden ||
+        !(window.WGame && WGame.state && WGame.state() === 'DIALOGUE')) return;
     var r = canvas.getBoundingClientRect();
     var mx = e.clientX - r.left, my = e.clientY - r.top;
     for (var i = 0; i < hitRects.length; i++) {
@@ -336,7 +360,8 @@ window.WDialogue = (function () {
   }
 
   function onDigit(e) {
-    if (!active() || giftMode || document.hidden) return;
+    if (!active() || giftMode || document.hidden ||
+        !(window.WGame && WGame.state && WGame.state() === 'DIALOGUE')) return;
     var m = /^([1-9])$/.exec(e.code.replace(/^Digit|^Numpad/, ''));
     if (!m) return;
     var idx = parseInt(m[1], 10) - 1;

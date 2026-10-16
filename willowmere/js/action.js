@@ -30,11 +30,13 @@ window.WAction = (function () {
     fish_siltjaw: { name: 'Siltjaw', desc: 'Con cá hồ huyền thoại mà Finn săn.', kind: 'fish' },
     mote: { name: 'Hạt Sáng', desc: 'Bóng liễu bị giữ lại giữa dòng trôi.', kind: 'treasure' },
     food_honeycomb: { name: 'Miếng tổ ong', desc: 'Mật rừng, vẫn còn vo ve.', kind: 'food' },
-    seeds_pouch: { name: 'Túi hạt giống', desc: 'Túi vải hạt giống của Gideon.', kind: 'key' },
-    moonbell: { name: 'Hoa chuông trăng', desc: 'Đóa hoa rừng đêm phát sáng.', kind: 'treasure' },
-    lens_cloth: { name: 'Khăn lau thấu kính', desc: 'Khăn đánh bóng của người giữ đèn.', kind: 'key' },
-    wool_cloak: { name: 'Áo choàng len', desc: 'Len đồi, chống mưa — phần lớn là vậy.', kind: 'key' },
-    letter: { name: 'Lá thư cũ', desc: 'Vệt muối loang, được giữ nhiều năm.', kind: 'key' }
+    /* noGift: quest-unique keepsakes (§4 — nothing can be lost); the gift
+       picker filters them and WAction.gift refuses them politely */
+    seeds_pouch: { name: 'Túi hạt giống', desc: 'Túi vải hạt giống của Gideon.', kind: 'key', noGift: true },
+    moonbell: { name: 'Hoa chuông trăng', desc: 'Đóa hoa rừng đêm phát sáng.', kind: 'treasure', noGift: true },
+    lens_cloth: { name: 'Khăn lau thấu kính', desc: 'Khăn đánh bóng của người giữ đèn.', kind: 'key', noGift: true },
+    wool_cloak: { name: 'Áo choàng len', desc: 'Len đồi, chống mưa — phần lớn là vậy.', kind: 'key', noGift: true },
+    letter: { name: 'Lá thư cũ', desc: 'Vệt muối loang, được giữ nhiều năm.', kind: 'key', noGift: true }
   };
 
   /* Inventory-lite: 24 slots (distinct item kinds, §5.4 cap), each holding
@@ -103,8 +105,11 @@ window.WAction = (function () {
       disliked: ''
     },
     finn: {
+      /* fish_any is loved (§3.1) — the fish line lives on 'loved'; the
+         dragonfly keeps its own line via the per-item override above */
       loved: 'MỘT CON CÁ?! Quà đỉnh nhất LUÔN! Treo lên cờ thủy thủ đoàn!',
-      liked: 'Chuồn chuồn! Như một con diều tí hon có ý kiến riêng!',
+      critter_dragonfly: 'Chuồn chuồn! Như một con diều tí hon có ý kiến riêng!',
+      liked: 'Cua cát! Đồng đội mới của thủy thủ đoàn — giáp cứng, bắt tay chắc luôn!',
       neutral: 'Ooo. Sáng bóng-đại-khái. Chính thức là hàng hóa rồi.',
       disliked: 'Tổ ong á? Dính nhớp tay, thôi cảm ơn \u2014 anh cầm đi, em giám sát.'
     },
@@ -461,7 +466,9 @@ window.WAction = (function () {
       if (inWindow(h, f.from, f.to) && (f.biome === null || f.biome === biome) &&
           (!f.weather || f.weather === weather)) q.push(f);
     }
-    if (!q.length) return 'fish_minnow';
+    /* minnow is the every-water fallback, but only inside its own 7-20
+       window — outside it no species is legal and the bite slips away */
+    if (!q.length) return inWindow(h, 7, 20) ? 'fish_minnow' : null;
     for (i = 0; i < q.length; i++) {
       if (q[i].rare && WU.chance(0.25)) return q[i].id;
     }
@@ -492,16 +499,22 @@ window.WAction = (function () {
         fish.state = 'idle';
         if (window.WParticles) WParticles.emit('splash', fish.bx, fish.by, { vy: -60 });
         break;
-      case 'bite': // stage 2: hook in time
+      case 'bite': { // stage 2: hook in time
+        var picked = pickFish(
+          world.biomeAt((fish.bx / world.TILE) | 0, (fish.by / world.TILE) | 0),
+          lastEnv ? WU.hnorm(lastEnv.hour) : 12,
+          lastEnv ? lastEnv.weather : 'clear');
+        if (!picked) {   // no legal species this hour: the bite slips away
+          fish.state = 'idle';
+          if (window.WHUD) WHUD.toast('Nó lặng lẽ trốn mất.');
+          break;
+        }
         fish.state = 'reel';
         fish.reelT = 0;
         fish.markerT = 0;
         fish.marker = 0.5;   // matches the first updateFish tick (sin 0) so a
                              // same-frame press resolves instead of NaN-missing
-        fish.fishId = pickFish(
-          world.biomeAt((fish.bx / world.TILE) | 0, (fish.by / world.TILE) | 0),
-          lastEnv ? WU.hnorm(lastEnv.hour) : 12,
-          lastEnv ? lastEnv.weather : 'clear');
+        fish.fishId = picked;
         fish.bandW = 0.30;
         for (var fd = 0; fd < FISH_DEFS.length; fd++) {
           if (FISH_DEFS[fd].id === fish.fishId && FISH_DEFS[fd].band) {
@@ -512,6 +525,7 @@ window.WAction = (function () {
         fish.bandPos = WU.rand(0.08, 0.92 - fish.bandW);
         WAudio.sfx('reel');
         break;
+      }
       case 'reel': {
         var hit = fish.marker >= fish.bandPos && fish.marker <= fish.bandPos + fish.bandW;
         if (hit) {
@@ -682,6 +696,10 @@ window.WAction = (function () {
   };
   var enemies = [];
   var enemyT = 5;
+  /* spawn ring follows the real view (main.js feeds the half view size each
+     frame) so foes enter from just past the edge on any window size */
+  var viewHalfW = 480, viewHalfH = 360;
+  function spawnRMax() { return Math.max(viewHalfW, viewHalfH) + 64; }
 
   /* hour window, wrapping midnight: [20,5] means 20:00 -> 05:00 */
   function inHours(h, win) {
@@ -715,18 +733,21 @@ window.WAction = (function () {
 
   function spawnEnemy(px, py, env) {
     var h = WU.hnorm(env.hour);
-    var ang = WU.rand(0, WU.TAU), d = WU.rand(430, 610);   // just past the view edge
+    var rMax = spawnRMax();
+    var ang = WU.rand(0, WU.TAU), d = WU.rand(rMax, rMax + 180);   // just past the view edge
     var x = px + Math.cos(ang) * d, y = py + Math.sin(ang) * d;
     var biome = WWorld.biomeAt((x / WWorld.TILE) | 0, (y / WWorld.TILE) | 0);
     var kind = null;
     if (inHours(h, ENEMY_DEFS.crab.hours) && biome === 'beach') kind = 'crab';
     else if (inHours(h, ENEMY_DEFS.wisp.hours) &&
-             (biome === 'forest' || biome === 'hills' || biome === 'headland' || biome === 'meadow')) {
+             (biome === 'forest' || biome === 'hills' || biome === 'headland')) {
       /* day 8+: some night shadows come up elder instead */
       kind = (env.day >= 8 && WU.chance(0.25)) ? 'elder' : 'wisp';
     }
-    /* once the lamp burns, the held-back shadows are free — none return */
-    if ((kind === 'wisp' || kind === 'elder') && window.WStory && WStory.flag('lampLit')) return;
+    /* once the lamp burns, the held-back shadows are free — none return.
+       lampLit is the story module's property getter, not a flag (world.js
+       reads the same channel) */
+    if ((kind === 'wisp' || kind === 'elder') && window.WStory && WStory.lampLit) return;
     if (!kind || enemies.length >= 6 || !enemyWalkable(x, y)) return;
     enemies.push(makeEnemy(kind, x, y));
   }
@@ -765,7 +786,7 @@ window.WAction = (function () {
     for (var i = enemies.length - 1; i >= 0; i--) {
       var e = enemies[i];
       var dp = WU.dist(e.x, e.y, player.x, player.y);
-      if (dp > 640) { enemies.splice(i, 1); continue; }
+      if (dp > spawnRMax() + 220) { enemies.splice(i, 1); continue; }   // past the spawn ring + slack
       /* out of hours: a night shadow dissolves at dawn, a crab slips
          under the sand at dusk — a farewell, not a kill */
       if (!inHours(WU.hnorm(env.hour), e.def.hours)) {
@@ -1008,16 +1029,25 @@ window.WAction = (function () {
     if (!ITEMS[itemKey] || count(itemKey) <= 0) {
       return { line: 'Bạn đưa tay tới, nhưng túi đồ trống.', delta: 0, tier: 'none' };
     }
+    if (ITEMS[itemKey].noGift) {
+      /* quest-unique keepsakes are not gifts (§4: nothing can be lost) —
+         a polite refusal, the item stays in the pouch */
+      return {
+        line: 'Bạn nhìn món đồ rồi thôi — nó có việc riêng của nó, không phải quà.',
+        delta: 0, tier: 'none'
+      };
+    }
     var env = lastEnv || { day: 1 };
     var day = env.day || 1;
     var again = giftDay[npcId] === day;
     var tier = 'neutral';
     if (def) {
       var kind = ITEMS[itemKey].kind;
-      if (def.loved.indexOf(itemKey) >= 0) tier = 'loved';
-      else if (def.liked.indexOf(itemKey) >= 0 ||
-               (def.liked.indexOf('critter_any') >= 0 && kind === 'critter') ||
-               (def.liked.indexOf('fish_any') >= 0 && kind === 'fish')) tier = 'liked';
+      /* wildcards ('fish_any', 'critter_any') count in loved as well as
+         liked — Finn's favourite is "any fish", not one species */
+      var tag = kind === 'fish' ? 'fish_any' : kind === 'critter' ? 'critter_any' : null;
+      if (def.loved.indexOf(itemKey) >= 0 || (tag && def.loved.indexOf(tag) >= 0)) tier = 'loved';
+      else if (def.liked.indexOf(itemKey) >= 0 || (tag && def.liked.indexOf(tag) >= 0)) tier = 'liked';
       else if (def.disliked.indexOf(itemKey) >= 0) tier = 'disliked';
     }
     var delta = TIER_HEARTS[tier];
@@ -1027,7 +1057,10 @@ window.WAction = (function () {
       line = AGAIN_LINES[npcId] || 'Một món quà mỗi ngày \u2014 giữ cho việc cho đi vẫn ấm áp.';
     } else {
       giftDay[npcId] = day;
-      var pool = (GIFT_LINES[npcId] && GIFT_LINES[npcId][tier]) || '';
+      /* a per-item line wins (Finn's dragonfly keeps its own loved line);
+         otherwise the tier line speaks */
+      var gl = GIFT_LINES[npcId] || {};
+      var pool = gl[itemKey] || gl[tier] || '';
       line = pool || 'Cảm ơn, Quản lý.';
     }
     remove(itemKey, 1);                          // the gift leaves the pouch
@@ -1208,6 +1241,10 @@ window.WAction = (function () {
     trySling: trySling,
     trySwing: trySwing,
     enemies: function () { return enemies; },
+    setViewHalf: function (hw, hh) {         // spawn ring source (main.js camera)
+      if (hw > 0) viewHalfW = hw;
+      if (hh > 0) viewHalfH = hh;
+    },
     spawnEnemyFor: function (kind, x, y) {   // test/debug hook
       var e = makeEnemy(kind, x, y);
       enemies.push(e);

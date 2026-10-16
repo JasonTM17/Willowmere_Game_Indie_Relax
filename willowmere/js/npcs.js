@@ -86,19 +86,20 @@ window.WNpcs = (function () {
       spriteRow: 4, voice: 'marlow', speed: 42,
       /* §3.1: 5-8 tide pools · 8-11 hut · 11-15 driftwood loop · 15-18 hut ·
          18-21 lighthouse base · 21+ hut. The engine walks at real-time
-         42 px/s (hut -> beach = ~3.2 h), so the tide-pool commute is packed
-         into 2-5 and he stands the whole §3.1 5-8 beat. Lighthouse runs to
-         21.5 so Finn's evening visit overlaps it (pair am_lamp). */
+         42 px/s: the tide-pool commute is packed into 2-5 and the pools beat
+         ends at 7 so the ~3.5 h walk still lands him on the §3.1 8-11 hut
+         beat (~10:30). Lighthouse runs to 22:45 so Finn's evening visit
+         overlaps it with room to arrive (pair am_lamp). */
       schedule: [
         { from: 0, to: 2, poi: 'hut' },
         { from: 2, to: 5, poi: 'tide_pools' },
-        { from: 5, to: 8, poi: 'tide_pools' },
-        { from: 8, to: 11, poi: 'hut' },
+        { from: 5, to: 7, poi: 'tide_pools' },
+        { from: 7, to: 11, poi: 'hut' },
         { from: 11, to: 13, poi: 'driftwood_1' },
         { from: 13, to: 15, poi: 'driftwood_2' },
         { from: 15, to: 18, poi: 'hut' },
-        { from: 18, to: 21.5, poi: 'lighthouse_base' },
-        { from: 21.5, to: 24, poi: 'hut' }
+        { from: 18, to: 22.75, poi: 'lighthouse_base' },
+        { from: 22.75, to: 24, poi: 'hut' }
       ],
       rainPoi: null,
       loved: ['critter_glow_worm', 'fish_moonfish'],
@@ -112,16 +113,18 @@ window.WNpcs = (function () {
       spriteRow: 5, voice: 'finn', speed: 42,
       /* §3.1 beats restored: dawn pier (with the Rosa duck-lunch pair),
          forest scout loop, beach tide pools, green games, a wait for
-         grandpa at the tower, home late evening. Long walks are absorbed by
-         the beat windows (pier -> scout trail alone is ~1.7 h). */
+         grandpa at the tower, home late evening. The tower beat runs to
+         22.5 — the green-games walk alone eats ~1.8 h, so a shorter wait
+         never let the am_lamp pair meet; long walks are absorbed by the
+         beat windows (pier -> scout trail alone is ~1.7 h). */
       schedule: [
         { from: 0, to: 5.5, poi: 'finn_door' },
         { from: 5.5, to: 12, poi: 'pier' },
         { from: 12, to: 14, poi: 'scout_trail_1' },
         { from: 14, to: 17, poi: 'tide_pools' },
         { from: 17, to: 19.5, poi: 'green_games' },
-        { from: 19.5, to: 21, poi: 'lighthouse_base' },
-        { from: 21, to: 24, poi: 'finn_door' }
+        { from: 19.5, to: 22.5, poi: 'lighthouse_base' },
+        { from: 22.5, to: 24, poi: 'finn_door' }
       ],
       rainPoi: null,
       loved: ['fish_any', 'critter_dragonfly'],
@@ -210,7 +213,9 @@ window.WNpcs = (function () {
      has no shared geography under faithful §3.1 — his mornings are at the
      tide pools, Bramble's on the pasture — so it is kept as §3.3 data but
      does not fire; am_forecast lost its dock overlap to Finn's green games.
-     am_lamp fires in the short window where both stand at the tower base. ---- */
+     am_lamp fires where both stand at the tower base: Finn arrives ~21.4
+     (green_games -> tower is ~1.8 h) and stays to 22.5, Marlow holds the
+     base to 22.75 — a ~1.1 h overlap every evening. ---- */
   var PAIRS = [
     { id: 'am_honey', a: 'mira', b: 'gideon', poi: 'green_well', hour: [11, 13], requires: null, lines: [
       { sp: 'mira', text: 'Bốn mươi năm rồi, Gideon, và ông vẫn mặc cả mật ong.' },
@@ -240,7 +245,7 @@ window.WNpcs = (function () {
     { id: 'am_forecast', a: 'finn', b: 'hana', poi: 'dock', hour: [19, 21], requires: null, lines: [
       { sp: 'finn', text: 'Sương mù. TO NHẤT. LUÔN. Ngày mai. Em cảm trong đôi ủng!' },
       { sp: 'hana', text: 'Dự báo: có mây, kèm xác suất cậu đúng được một lần.' },
-      { sp: 'finn', text: 'Cô sẽ THẤY. Và rồi cô sẽ nợ em một cái bánh tà\u2026 một lời khen.' },
+      { sp: 'finn', text: 'Cô sẽ THẤY. Và rồi cô sẽ nợ em một cái bánh tà\u2026 khen em.' },
       { sp: 'hana', text: 'Hẹn hôm mưa.' }
     ] },
     { id: 'am_colors', a: 'junie', b: 'rosa', poi: 'green_well', hour: [16.9, 17.6],
@@ -258,12 +263,12 @@ window.WNpcs = (function () {
     { id: 'am_seeds_b', a: 'gideon', b: 'rosa', poi: 'green_bench', hour: [18, 20.5],
       requires: { quest: { id: 'seeds_of_spring', state: 'done_b' } }, lines: [
       { sp: 'gideon', text: 'Luống dự thi của Rosa mọc sáng như quầy chợ.' },
-      { sp: 'rosa', text: 'Hạt của ông đấy, Gideon. Tôi chỉ cho chúng một góc nhìn đẹp hơn.' },
+      { sp: 'rosa', text: 'Hạt của ông đấy, Gideon. Tôi chỉ cho chúng góc nhìn đẹp hơn.' },
       { sp: 'gideon', text: 'Hm. Góc nhìn cãi lại. Giữ luống đi.' }
     ] },
     { id: 'am_lamp', a: 'finn', b: 'marlow', poi: 'lighthouse_base', hour: [18, 24],
       requires: { flags: ['marlow_confession'] }, lines: [
-      { sp: 'finn', text: 'Ông nội ơi. Khi nó sáng lại \u2014 em được đếm các nhịp chớp không?' },
+      { sp: 'finn', text: 'Ông nội ơi. Khi đèn sáng lại, em được đếm các nhịp không?' },
       { sp: 'marlow', text: 'Được chứ. Ta sẽ đếm cùng nhau, từng nhịp một.' },
       { sp: 'finn', text: 'Kể cả nhịp rơi trên đồi? NHẤT LÀ NHỊP ĐÓ.' }
     ] }
@@ -511,13 +516,19 @@ window.WNpcs = (function () {
     var gy = (last && anchorFree) ? n.anchor.y : wp.y;
     var arrived = stepToward(n, gx, gy, dt);
     if (last && WU.dist(n.x, n.y, gx, gy) < 6) arrived = true;
-    if (arrived) {
+    /* stepToward's d<3 is "arrived at THIS waypoint" — only the final one
+       may settle into idle; a mid-path hit (incl. waypoint 0, the tile the
+       NPC starts from) just advances the walk or the villager pins itself
+       at the spawn tile all day */
+    if (arrived && !last) {
+      n.pi++;
+    } else if (arrived) {
       n.mode = 'idle';
       n.idleT = WU.rand(2, 4);
       n.path = null;
       return;
     }
-    if (!last) {
+    if (!last && !arrived) {
       if (WU.dist(n.x, n.y, wp.x, wp.y) < 5) n.pi++;
     }
     /* stuck detection -> recompute the path (cooldown keeps it cheap) */
@@ -846,14 +857,17 @@ window.WNpcs = (function () {
         ctx.font = '600 10px "Segoe UI",Verdana,sans-serif';
         ctx.textAlign = 'center';
         var firstName = n.def.name.split(' ')[0];
+        /* friendship peeks out on the tag once it exists — the only place
+           hearts are visible outside gift toasts */
+        var hTxt = n.hearts > 0 ? ' \u2665' + (Math.round(n.hearts * 2) / 2) : '';
         ctx.fillStyle = 'rgba(16,14,10,0.62)';
-        var nw = ctx.measureText(firstName).width + 12;
+        var nw = ctx.measureText(firstName + hTxt).width + 12;
         ctx.beginPath();
         if (ctx.roundRect) ctx.roundRect(n.x - nw / 2, n.y + 6, nw, 14, 7);
         else ctx.rect(n.x - nw / 2, n.y + 6, nw, 14);
         ctx.fill();
         ctx.fillStyle = 'rgba(246,238,218,0.95)';
-        ctx.fillText(firstName, n.x, n.y + 16);
+        ctx.fillText(firstName + hTxt, n.x, n.y + 16);
       }
       /* a quest waits on this villager — gold '!' says who, the quest card
          already says what. Bonus hand-offs (Marlow's staff, Junie's thanks)

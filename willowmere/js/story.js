@@ -156,14 +156,31 @@ window.WStory = (function () {
   }
 
   /* ---- talk node priority helpers ---- */
+  /* nodeId -> requires, captured once at registerNodes so questNodeFor (and
+     the '!' marker / minimap glow it feeds) only surface nodes that can
+     actually open right now — an hour-gated turn-in must not advertise
+     itself all day */
+  var nodeReq = {};
+
+  function nodeOpen(id) {
+    var req = nodeReq[id];
+    if (!req) return true;
+    return !!(window.WDialogue && WDialogue.checkRequires &&
+              WDialogue.checkRequires(req));
+  }
+
   function questNodeFor(npcId) {
     for (var k in QUESTS) {
       if (!QUESTS.hasOwnProperty(k)) continue;
       if (k === 'the_dark_lamp') continue;   // main arc is driven by the tower door
       var q = QUESTS[k];
       if (q.npc !== npcId) continue;
-      if (q.state === 'available') return 'q_' + k + '_hook';
-      if (q.state === 'active') return 'q_' + k + '_turnin';
+      if (q.state === 'available' && nodeOpen('q_' + k + '_hook')) {
+        return 'q_' + k + '_hook';
+      }
+      if (q.state === 'active' && nodeOpen('q_' + k + '_turnin')) {
+        return 'q_' + k + '_turnin';
+      }
     }
     return null;
   }
@@ -177,7 +194,8 @@ window.WStory = (function () {
        over the stick that carried him up the lamp stairs (WAction reads
        keeper_staff live: longer reach, wider arc, hits for 2) */
     if (npcId === 'marlow' && isDone(QUESTS.keeper_regret) && !flag('keeper_staff')) {
-      if (window.WHUD) WHUD.toast('Marlow đưa cho bạn Gậy Giữ Đèn \u2014 vung xa và nặng hơn.');
+      /* pure query: the draw loops call this every frame, so the hand-off
+         toast fires once in WDialogue.startForNpc when the node starts */
       return 'marlow_staff';
     }
     return null;
@@ -419,7 +437,9 @@ window.WStory = (function () {
     if (flag('lamb_led')) out.push({ text: 'Cánh cổng mới ở rìa rừng mở ra dễ dàng và đóng lại nhẹ nhàng, giống Bramble.' });
     if (flag('junie_stays')) out.push({ text: 'Giá vẽ của Junie đứng cạnh bến tàu hầu hết các buổi sáng. Willowmere có đủ mọi màu của cô ấy.' });
     if (flag('junie_leaves')) out.push({ text: 'Một lá thư đến với dấu bưu thành phố: những bức tranh về một hồ nước \u2014 và bức nào cũng có một ngọn đèn trong đó.' });
-    if (flag('lens_cloth')) {
+    /* lens_cloth is an item, never a flag — check the pouch (DESIGN §4:
+       "if lens_cloth is held, the polishing line changes") */
+    if (window.WAction && WAction.count('lens_cloth') > 0) {
       out.push({ text: 'Chiếc khăn lau thấu kính đã làm phần việc thầm lặng của nó, và ánh sáng đi qua trong veo.' });
     } else {
       out.push({ text: 'Bạn lau kính lửa bằng ống tay áo. Thế là đủ. Vốn dĩ nó luôn là đủ.' });
@@ -537,12 +557,12 @@ window.WStory = (function () {
       requires: { quest: { id: 'big_one', state: 'active' } },
       choices: [
         C('(Giơ chiến lợi phẩm lên.) Siltjaw chào cậu nè.', {
-          requires: { flags: ['siltjaw_caught'] },
+          requires: { flags: ['siltjaw_caught'], items: { fish_siltjaw: 1 } },
           take: { fish_siltjaw: 1 },
           setFlags: { finn_big_one: 1 }, next: 'q_big_one_done_a'
         }),
         C('Siltjaw là của hồ, Finn à. Để huyền thoại bơi tiếp đi.', {
-          requires: { flags: ['siltjaw_caught'] },
+          requires: { flags: ['siltjaw_caught'], items: { fish_siltjaw: 1 } },
           take: { fish_siltjaw: 1 },
           setFlags: { siltjaw_freed: 1 }, next: 'q_big_one_done_b'
         })
@@ -640,10 +660,12 @@ window.WStory = (function () {
         }),
         C('Đám Selkie đã vào bến an toàn. Rosa giữ lá thư của họ.', {
           requires: { flags: ['truth_known'] },
-          setFlags: { truth_told: 1 }, next: 'q_truth_told'
+          /* the confession scene happened either way — the climb gate (§3.2)
+             must open; the quest itself stays active for the comfort branch */
+          setFlags: { truth_told: 1, marlow_confession: 1 }, next: 'q_truth_told'
         }),
         C('(Giữ lấy huyền thoại. Ở bên ông ấy thay vào đó.)', {
-          setFlags: { secret_kept: 1 }
+          setFlags: { secret_kept: 1, marlow_confession: 1 }
         })
       ]
     });
@@ -698,6 +720,11 @@ window.WStory = (function () {
     m.junie_palette = N('junie', 'Một hạt ánh hồ\u2026 đúng cái màu xanh tôi không bao giờ pha được. Cảm ơn, Quản lý.', {
       setFlag: 'junie_palette_said'
     });
+
+    /* capture the requires table for nodeOpen() (questNodeFor gating) */
+    for (var id2 in m) {
+      if (m.hasOwnProperty(id2) && m[id2] && m[id2].requires) nodeReq[id2] = m[id2].requires;
+    }
 
     WDialogue.register(m);
   }
